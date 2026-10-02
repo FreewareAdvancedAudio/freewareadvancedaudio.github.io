@@ -1,0 +1,36 @@
+media:
+  input: docs/public
+  output: /
+
+collections:
+  - name: docs
+    label: Documentation Pages
+    type: folder
+    path: docs/docs
+    extension: md
+    fields:
+      - name: title
+        label: Title
+        type: string
+      - name: body
+        label: Content
+        type: rich-text
+
+  - name: blog
+    label: Blog & Announcements
+    type: folder
+    path: docs/blog
+    extension: md
+    fields:
+      - name: title
+        label: Title
+        type: string
+      - name: date
+        label: Publication Date
+        type: date
+      - name: author
+        label: Author
+        type: string
+      - name: body
+        label: Body
+        type: rich-text

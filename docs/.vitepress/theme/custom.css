@@ -1,0 +1,134 @@
+/* Custom VitePress Theme Styles for Freeware Advanced Audio */
+
+:root {
+  --vp-c-brand-1: #06b6d4;
+  --vp-c-brand-2: #3b82f6;
+  --vp-c-brand-3: #8b5cf6;
+  --vp-c-brand-soft: rgba(6, 182, 212, 0.14);
+
+  --vp-c-bg: #0f172a;
+  --vp-c-bg-alt: #1e1b4b;
+  --vp-c-bg-elv: #1e293b;
+  --vp-c-bg-soft: #1e293b;
+
+  --vp-c-text-1: #f8fafc;
+  --vp-c-text-2: #cbd5e1;
+  --vp-c-text-3: #94a3b8;
+
+  --vp-c-divider: rgba(255, 255, 255, 0.1);
+  --vp-c-gutter: rgba(255, 255, 255, 0.05);
+
+  --vp-nav-bg-color: #0f172a;
+  --vp-sidebar-bg-color: #0f172a;
+}
+
+/* Hero Section Custom Gradient Title */
+.VPHero .name {
+  background: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #f43f5e 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  font-weight: 900 !important;
+}
+
+.VPFeature {
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(30, 41, 59, 0.6) !important;
+  backdrop-filter: blur(8px);
+  transition: all 0.25s ease-in-out !important;
+}
+
+.VPFeature:hover {
+  border-color: #06b6d4 !important;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px -5px rgba(6, 182, 212, 0.2);
+}
+
+.home-technical-wrapper {
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 0 1.5rem 3rem 1.5rem;
+}
+
+.VPHero .image-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+/* Mobile responsive adjustments for clean uncluttered layout */
+@media (max-width: 959px) {
+  .VPHero {
+    padding-top: calc(var(--vp-nav-height, 64px) + 2rem) !important;
+    padding-bottom: 1.5rem !important;
+  }
+
+  .VPHero .container {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 1.5rem;
+  }
+
+  .VPHero .image {
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 380px !important;
+  }
+
+  .VPHero .main {
+    margin-top: 0 !important;
+    text-align: center;
+  }
+
+  .VPHero .name, .VPHero .text {
+    font-size: 2.25rem !important;
+    line-height: 1.15 !important;
+    margin: 0 auto !important;
+  }
+
+  .VPHero .tagline {
+    font-size: 1rem !important;
+    line-height: 1.4 !important;
+    margin: 0.75rem auto !important;
+    padding: 0 0.5rem;
+  }
+
+  .VPHero .actions {
+    justify-content: center !important;
+    gap: 0.5rem !important;
+  }
+
+  .VPHero .action {
+    padding: 0 0.5rem !important;
+  }
+
+  .VPFeature {
+    padding: 1rem !important;
+  }
+
+  .VPFeatures {
+    padding-top: 1rem !important;
+    padding-bottom: 1rem !important;
+  }
+
+  .home-technical-wrapper {
+    padding: 0 1rem 1.5rem 1rem !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .VPHero .name, .VPHero .text {
+    font-size: 1.85rem !important;
+  }
+
+  .VPHero .tagline {
+    font-size: 0.9rem !important;
+  }
+
+  .VPNavBarTitle .title {
+    font-size: 0.825rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+}
