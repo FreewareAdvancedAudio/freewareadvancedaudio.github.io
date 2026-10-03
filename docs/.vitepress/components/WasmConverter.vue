@@ -59,7 +59,7 @@
           </div>
           <div class="preset-buttons">
             <button
-              v-for="preset in [64, 96, 128, 160, 192, 256]"
+              v-for="preset in [32, 48, 64, 96, 128, 160, 192, 256, 320]"
               :key="preset"
               class="preset-btn"
               :class="{ active: bitrate === preset }"
@@ -74,6 +74,7 @@
         <div class="control-group">
           <label class="control-label" for="aac-profile">AAC profile</label>
           <select id="aac-profile" v-model="objectType" :disabled="isProcessing" class="control-select">
+            <option value="auto">Auto</option>
             <option value="lc">AAC-LC</option>
             <option value="he-v1">HE-AAC v1 (SBR)</option>
           </select>
@@ -134,7 +135,7 @@ const fileInput = ref(null)
 const selectedFile = ref(null)
 const isDragOver = ref(false)
 const bitrate = ref(128)
-const objectType = ref('lc')
+const objectType = ref('auto')
 const isProcessing = ref(false)
 const progress = ref(0)
 const statusMessage = ref('')
@@ -235,10 +236,11 @@ async function startEncoding() {
         const outName = `${baseName}_faac_${bitrate.value}k.m4a`
         const outBlob = new Blob([outputBuffer], { type: 'audio/mp4' })
         const url = URL.createObjectURL(outBlob)
+        const profileLabel = msg.resolvedObjectType === 'he-v1' ? 'HE-AAC v1' : 'AAC-LC'
 
         results.value.unshift({
           name: outName,
-          details: `${bitrate.value} kbps ABR • AAC-${objectType.value.toUpperCase()} • ${sampleRate} Hz • ${formatChannelLayout(channels)}`,
+          details: `${bitrate.value} kbps ABR • ${profileLabel} • ${sampleRate} Hz • ${formatChannelLayout(channels)}`,
           url: url,
           rawBuffer: outputBuffer
         })

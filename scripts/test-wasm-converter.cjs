@@ -73,14 +73,16 @@ async function main() {
   const wasmBinary = fs.readFileSync(path.join(wasmDir, 'faac.wasm'));
   const workerSource = fs.readFileSync(path.join(__dirname, '../docs/public/wasm/faac-worker.js'), 'utf8');
   const cases = [
-    { objectType: 'lc', channels: 1, sampleRate: 44100, bitrate: 96, samples: 44117 },
-    { objectType: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
-    { objectType: 'he-v1', channels: 1, sampleRate: 44100, bitrate: 48, samples: 44117 },
-    { objectType: 'he-v1', channels: 2, sampleRate: 48000, bitrate: 64, samples: 48123 },
-    { objectType: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 123 },
-    { objectType: 'he-v1', channels: 2, sampleRate: 48000, bitrate: 64, samples: 123 },
-    { objectType: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 49152 },
-    { objectType: 'he-v1', channels: 2, sampleRate: 48000, bitrate: 64, samples: 49152 },
+    { objectType: 'auto', expectedResolved: 'he-v1', channels: 2, sampleRate: 44100, bitrate: 48, samples: 44117 },
+    { objectType: 'auto', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 1, sampleRate: 44100, bitrate: 96, samples: 44117 },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
+    { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 1, sampleRate: 44100, bitrate: 48, samples: 44117 },
+    { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 2, sampleRate: 48000, bitrate: 64, samples: 48123 },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 123 },
+    { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 2, sampleRate: 48000, bitrate: 64, samples: 123 },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 49152 },
+    { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 2, sampleRate: 48000, bitrate: 64, samples: 49152 },
   ];
   for (const settings of cases) {
     const pcm = new Int16Array(settings.samples * settings.channels);
@@ -112,6 +114,9 @@ async function main() {
     assert.equal(progress.at(-1), 98, 'Finalization has its own progress stage');
     const result = messages.find(message => message.type === 'complete');
     assert.ok(result, 'Worker must complete encoding');
+    if (settings.expectedResolved) {
+      assert.equal(result.resolvedObjectType, settings.expectedResolved, `Expected resolved profile ${settings.expectedResolved}`);
+    }
     const bytes = Buffer.from(result.encodedBytes);
     assert.equal(bytes.toString('ascii', 4, 8), 'ftyp');
     for (const atom of ['mdat', 'moov', 'esds']) assert.ok(bytes.includes(Buffer.from(atom)), atom);
@@ -119,7 +124,8 @@ async function main() {
     const text = bytes.toString('latin1');
     const gapless = text.match(/ ([0-9A-Fa-f]{8}) ([0-9A-Fa-f]{8}) ([0-9A-Fa-f]{8}) ([0-9A-Fa-f]{16})/);
     assert.ok(gapless, 'Gapless metadata must be present');
-    const divisor = settings.objectType === 'he-v1' ? 2 : 1;
+    const effectiveObjectType = result.resolvedObjectType || settings.objectType;
+    const divisor = effectiveObjectType === 'he-v1' ? 2 : 1;
     assert.equal(parseInt(gapless[4], 16), Math.floor((settings.samples + Math.floor(divisor / 2)) / divisor));
     assert.ok(parseInt(gapless[2], 16) > 0, 'Encoder priming must be recorded');
     const name = `${settings.objectType}-${settings.channels}ch-${settings.samples}.m4a`;

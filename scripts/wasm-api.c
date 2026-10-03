@@ -59,7 +59,7 @@ void wasm_converter_close(wasm_converter *session)
 }
 
 wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
-                                    uint32_t bitrate, int he_aac, int32_t *status)
+                                    uint32_t bitrate, int object_type, int32_t *status)
 {
     faac_params params;
     const uint8_t *asc;
@@ -78,7 +78,13 @@ wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
     params.num_channels = channels;
     params.bit_rate = channels ? bitrate / channels : 0;
     params.use_lfe = channels >= 6;
-    params.object_type = he_aac ? FAAC_OBJ_HE_AAC_V1 : FAAC_OBJ_LOW;
+    if (object_type == FAAC_OBJ_HE_AAC_V1) {
+        params.object_type = FAAC_OBJ_HE_AAC_V1;
+    } else if (object_type == FAAC_OBJ_LOW) {
+        params.object_type = FAAC_OBJ_LOW;
+    } else {
+        params.object_type = FAAC_OBJ_AUTO;
+    }
     params.output_format = FAAC_STREAM_RAW;
     params.input_format = FAAC_INPUT_16BIT;
     faac_library_info library = { .struct_size = sizeof(library) };
@@ -129,6 +135,11 @@ wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
 fail:
     wasm_converter_close(session);
     return NULL;
+}
+
+uint32_t wasm_converter_object_type(const wasm_converter *session)
+{
+    return session ? session->info.object_type : FAAC_OBJ_AUTO;
 }
 
 uint32_t wasm_converter_frame_samples(const wasm_converter *session)

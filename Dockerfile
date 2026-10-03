@@ -35,7 +35,7 @@ COPY scripts/wasm-api.c /build/wasm-api.c
 RUN mkdir -p /build/out_wasm && \
     emcc -O2 /build/wasm-api.c /build/faac_src/build_wasm/libfaac/libfaac.a /build/faac_src/build_wasm/frontend/libfrontend.a \
       -I/build/faac_src/include -I/build/faac_src/frontend \
-      -s EXPORTED_FUNCTIONS='["_wasm_converter_open","_wasm_converter_frame_samples","_wasm_converter_input","_wasm_converter_encode","_wasm_converter_finish","_wasm_converter_close","_wasm_converter_error","_wasm_converter_version","_malloc","_free"]' \
+      -s EXPORTED_FUNCTIONS='["_wasm_converter_open","_wasm_converter_object_type","_wasm_converter_frame_samples","_wasm_converter_input","_wasm_converter_encode","_wasm_converter_finish","_wasm_converter_close","_wasm_converter_error","_wasm_converter_version","_malloc","_free"]' \
       -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","getValue","setValue","FS","UTF8ToString","stringToUTF8","addFunction","removeFunction"]' \
       -s ALLOW_MEMORY_GROWTH=1 \
       -s ALLOW_TABLE_GROWTH=1 \
