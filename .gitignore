@@ -2,8 +2,14 @@ node_modules
 .DS_Store
 dist
 .vitepress/dist
-.vitepress/cache
+.vitepress/cache*
+docs/.vitepress/cache*
 *.log
 
-# Ignore compiled WebAssembly build output
-docs/public/wasm/
+# Ignore compiled WebAssembly build output except source worker & README
+docs/public/wasm/*
+!docs/public/wasm/faac-worker.js
+!docs/public/wasm/README.md
+
+# Ignore auto-generated CLI docs
+docs/docs/*-cli-gen.md

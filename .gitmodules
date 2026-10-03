@@ -1,0 +1,6 @@
+[submodule "vendor/faac"]
+	path = vendor/faac
+	url = https://github.com/FreewareAdvancedAudio/faac.git
+[submodule "vendor/faad2"]
+	path = vendor/faad2
+	url = https://github.com/FreewareAdvancedAudio/faad2.git

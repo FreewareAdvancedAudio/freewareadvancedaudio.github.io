@@ -132,3 +132,41 @@
     text-overflow: ellipsis !important;
   }
 }
+
+/* Quiet visual landmarks; icons supplement the visible heading text. */
+:root {
+  --audio-icon-cyan: #67e8f9;
+  --audio-icon-blue: #93c5fd;
+  --audio-icon-violet: #c4b5fd;
+}
+
+.vp-doc .section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-right: 0.5rem;
+  border-radius: 0.5rem;
+  background: var(--vp-c-brand-soft);
+  color: var(--audio-icon-cyan);
+  font-size: 0.875rem;
+  vertical-align: 0.1em;
+}
+
+.VPFeature .icon {
+  background: rgba(103, 232, 249, 0.07);
+  border: 1px solid rgba(103, 232, 249, 0.12);
+  border-radius: 0.75rem;
+}
+
+.feature-icon { color: var(--audio-icon-cyan); }
+.feature-icon--blue { color: var(--audio-icon-blue); }
+.feature-icon--violet { color: var(--audio-icon-violet); }
+
+.home-technical-wrapper > h2:first-child { border-top: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .VPFeature { transition: none !important; }
+  .VPFeature:hover { transform: none; }
+}

@@ -1,0 +1,9 @@
+.git
+**/.git
+node_modules
+docs/.vitepress/dist
+docs/.vitepress/cache*
+docs/public/wasm/faac.js
+docs/public/wasm/faac.wasm
+*.log
+*.swp

@@ -26,18 +26,28 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
+          submodules: recursive
 
-      - name: Install dependencies
-        run: npm ci || npm install
+      - name: Read GitHub Pages URL
+        if: github.event_name != 'pull_request'
+        id: pages
+        uses: actions/configure-pages@v5
 
-      - name: Build VitePress site
-        run: npm run docs:build
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build site via Docker and extract static output
+        env:
+          SITE_BASE_PATH: ${{ vars.SITE_BASE_PATH || steps.pages.outputs.base_path || '/' }}
+          SITE_ORIGIN: ${{ vars.SITE_ORIGIN || steps.pages.outputs.origin || 'https://freewareadvancedaudio.github.io' }}
+        run: |
+          docker build --build-arg SITE_BASE_PATH="$SITE_BASE_PATH" --build-arg SITE_ORIGIN="$SITE_ORIGIN" -t freeware-audio-site --target site-builder .
+          container_id=$(docker create freeware-audio-site)
+          mkdir -p docs/.vitepress/dist
+          docker cp $container_id:/app/docs/.vitepress/dist/. docs/.vitepress/dist/
+          docker rm $container_id
+          ls -la docs/.vitepress/dist/
 
       - name: Upload GitHub Pages artifact
         if: github.event_name != 'pull_request'

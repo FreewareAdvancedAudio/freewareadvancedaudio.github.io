@@ -1,0 +1,17 @@
+# Repository Licensing & Copyright
+
+The content and code in this repository are licensed under the following terms:
+
+## 1. Documentation & Website Content
+The documentation text, website guides, graphics, and static site content are licensed under the **Creative Commons Attribution-ShareAlike 4.0 International License (CC-BY-SA-4.0)**.
+
+To view a copy of this license, visit: https://creativecommons.org/licenses/by-sa/4.0/
+
+## 2. Interactive WebAssembly Component & Worker Code
+The interactive browser audio converter component and Web Worker code (`docs/public/wasm/faac-worker.js`) are licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+To view a copy of this license, visit: https://www.gnu.org/licenses/agpl-3.0.html
+
+## 3. Upstream Submodule Libraries
+- **FAAC (`vendor/faac`)**: Licensed under the **GNU Lesser General Public License v2.1+ (LGPL v2.1+)**.
+- **FAAD2 (`vendor/faad2`)**: Licensed under the **GNU General Public License v2+ (GPL v2+)**.
