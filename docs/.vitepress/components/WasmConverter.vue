@@ -4,7 +4,7 @@
       <div class="converter-header">
         <h3 class="converter-title"><i class="fa-solid fa-bolt" aria-hidden="true"></i> Try FAAC: Audio to M4A</h3>
         <p class="converter-subtitle">
-          <strong>Your audio stays in your browser.</strong> Encode to M4A with FAAC and download the result. Input format support depends on your browser. For music comparisons, start with a lossless source.
+          <strong>Your audio stays in your browser.</strong> Choose a file to decode it once, then compare settings and make multiple M4A encodes without decoding it again.
         </p>
       </div>
 
@@ -28,6 +28,7 @@
         </div>
         <div class="drop-text" v-else>
           <strong>Selected File:</strong> {{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }})
+          <span v-if="decodedAudio" class="source-meta"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Ready · {{ formatDuration(decodedAudio.duration) }} · {{ decodedAudio.sampleRate }} Hz · {{ formatChannelLayout(decodedAudio.channels) }}</span>
         </div>
         <input
           type="file"
@@ -38,14 +39,17 @@
         />
       </div>
 
-      <!-- Encoding Settings Panel -->
-      <div class="controls-grid" v-if="selectedFile">
+      <!-- Bitrate or quality is the primary control; less common choices stay available in More settings. -->
+      <div class="primary-setting" v-if="selectedFile">
         <div class="control-group">
-          <label class="control-label" for="bitrate">
-            Bitrate
+          <label v-if="rateControl !== 'vbr'" class="control-label" for="bitrate">
+            Target bitrate
             <span class="value-badge">{{ bitrate }} kbps</span>
           </label>
-          <div class="slider-wrapper">
+          <label v-else class="control-label" for="quality">
+            Quality <span class="value-badge">{{ quantQuality }}</span>
+          </label>
+          <div v-if="rateControl !== 'vbr'" class="slider-wrapper">
             <input
               id="bitrate"
               type="range"
@@ -57,7 +61,7 @@
               class="range-slider"
             />
           </div>
-          <div class="preset-buttons">
+          <div v-if="rateControl !== 'vbr'" class="preset-buttons">
             <button
               v-for="preset in [32, 48, 64, 96, 128, 160, 192, 256, 320]"
               :key="preset"
@@ -69,26 +73,54 @@
               {{ preset }}k
             </button>
           </div>
-        </div>
-
-        <div class="control-group">
-          <label class="control-label" for="aac-profile">AAC profile</label>
-          <select id="aac-profile" v-model="objectType" :disabled="isProcessing" class="control-select">
-            <option value="auto">Auto</option>
-            <option value="lc">AAC-LC</option>
-            <option value="he-v1">HE-AAC v1 (SBR)</option>
-          </select>
+          <input v-else id="quality" v-model.number="quantQuality" type="range" min="1" :max="maxQuantQuality" step="1" class="range-slider" :disabled="isProcessing || isDecoding" />
+          <p v-if="rateControl === 'vbr'" class="control-hint">Higher quality uses more data. Range: 1–{{ maxQuantQuality }}<span v-if="maxQuantQuality === 75"> for HE-AAC v1</span>; default: 100.</p>
+          <div v-if="rateControl === 'vbr'" class="preset-buttons quality-presets" aria-label="VBR quality presets">
+            <button v-for="preset in qualityPresets" :key="preset"
+              class="preset-btn" :class="{ active: quantQuality === preset }"
+              :disabled="isProcessing || isDecoding" @click="quantQuality = preset">{{ preset }}</button>
+          </div>
         </div>
       </div>
+
+      <details class="advanced-settings" v-if="selectedFile">
+        <summary>More settings <span>{{ rateControl.toUpperCase() }} · {{ objectType === 'auto' ? 'Auto profile' : objectType === 'lc' ? 'AAC-LC' : 'HE-AAC v1' }}</span></summary>
+        <div class="controls-grid">
+          <div class="control-group">
+            <label class="control-label" for="rate-control">Rate control</label>
+            <div id="rate-control" class="choice-segments" role="group" aria-label="Rate control">
+              <button v-for="mode in rateControlOptions" :key="mode.value" type="button"
+                class="choice-segment" :class="{ active: rateControl === mode.value }"
+                :aria-pressed="rateControl === mode.value" :disabled="isProcessing || isDecoding"
+                @click="rateControl = mode.value">
+                <span>{{ mode.label }}</span><small>{{ mode.hint }}</small>
+              </button>
+            </div>
+          </div>
+          <div class="control-group">
+            <label class="control-label" for="aac-profile">AAC profile</label>
+            <div id="aac-profile" class="choice-segments profile-segments" role="group" aria-label="AAC profile">
+              <button v-for="profile in profileOptions" :key="profile.value" type="button"
+                class="choice-segment" :class="{ active: objectType === profile.value }"
+                :aria-pressed="objectType === profile.value" :disabled="isProcessing || isDecoding"
+                @click="objectType = profile.value; normalizeQuality()">
+                <span>{{ profile.label }}</span><small>{{ profile.hint }}</small>
+              </button>
+            </div>
+          </div>
+        </div>
+      </details>
 
       <!-- Convert Action & Progress Bar -->
       <div class="action-area" v-if="selectedFile">
         <button
+          ref="convertButton"
           class="convert-btn"
-          :disabled="isProcessing"
+          :disabled="isProcessing || isDecoding || !decodedAudio"
           @click="startEncoding"
         >
-          <span v-if="!isProcessing">
+          <span v-if="isDecoding"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Decoding audio…</span>
+          <span v-else-if="!isProcessing">
             <i class="fa-solid fa-file-audio" aria-hidden="true"></i> Convert to M4A
           </span>
           <span v-else>
@@ -107,19 +139,33 @@
       </div>
 
       <!-- Encoded Audio Results -->
+      <p class="visually-hidden" aria-live="polite" aria-atomic="true">{{ resultAnnouncement }}</p>
       <div class="results-section" v-if="results.length > 0">
         <h4 class="results-title"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Encoded M4A Output</h4>
         <div class="result-card" v-for="item in results" :key="item.url">
           <div class="result-info">
             <span class="result-name">{{ item.name }}</span>
-            <span class="result-meta">{{ item.details }}</span>
+            <div class="result-meta">
+              <span v-for="detail in item.details" :key="detail.label" class="metadata-chip">
+                <span class="metadata-label">{{ detail.label }}</span>
+                <span>{{ detail.value }}</span>
+              </span>
+            </div>
           </div>
 
           <div class="result-actions">
             <audio ref="resultPlayers" controls :src="item.url" class="audio-player"></audio>
-            <a :href="item.url" :download="item.name" class="download-link">
-              <i class="fa-solid fa-download" aria-hidden="true"></i> Download .m4a
-            </a>
+            <div class="result-action-buttons">
+              <a :href="item.url" :download="item.name" class="icon-action download-link"
+                :aria-label="`Download ${item.name}`" title="Download output">
+                <i class="fa-solid fa-download" aria-hidden="true"></i>
+              </a>
+              <button ref="discardButtons" type="button" class="icon-action discard-button"
+                :aria-label="`Discard ${item.name}`" title="Discard output"
+                @click="discardResult(item)">
+                <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -128,19 +174,56 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { withBase } from 'vitepress'
 
 const fileInput = ref(null)
 const selectedFile = ref(null)
+const decodedAudio = ref(null)
+const isDecoding = ref(false)
+let decodeRequest = 0
 const isDragOver = ref(false)
 const bitrate = ref(128)
+const quantQuality = ref(100)
+const rateControl = ref('abr')
+const rateControlOptions = [
+  { value: 'vbr', label: 'VBR', hint: 'Quality' },
+  { value: 'abr', label: 'ABR', hint: 'Average bitrate' },
+  { value: 'cbr', label: 'CBR', hint: 'Constant bitrate' },
+]
+const profileOptions = [
+  { value: 'auto', label: 'Auto', hint: 'Recommended' },
+  { value: 'lc', label: 'AAC-LC', hint: 'Standard' },
+  { value: 'he-v1', label: 'HE-AAC v1', hint: 'SBR' },
+]
 const objectType = ref('auto')
 const isProcessing = ref(false)
 const progress = ref(0)
 const statusMessage = ref('')
 const results = ref([])
 const resultPlayers = ref([])
+const convertButton = ref(null)
+const discardButtons = ref([])
+const resultAnnouncement = ref('')
+const maxQuantQuality = computed(() => objectType.value === 'he-v1' ? 75 : 5000)
+const qualityPresets = computed(() => [20, 30, 40, 50, 60, 75, 100, 150, 200, 300, 500, 800].filter(value => value <= maxQuantQuality.value))
+
+function normalizeQuality() {
+  if (quantQuality.value > maxQuantQuality.value) quantQuality.value = maxQuantQuality.value
+}
+
+async function discardResult(item) {
+  const index = results.value.indexOf(item)
+  if (index < 0) return
+  resultPlayers.value[index]?.pause()
+  URL.revokeObjectURL(item.url)
+  results.value.splice(index, 1)
+  resultAnnouncement.value = `Discarded ${item.name}.`
+  await nextTick()
+  const nextButton = discardButtons.value[Math.min(index, discardButtons.value.length - 1)]
+  const focusTarget = nextButton || convertButton.value
+  focusTarget?.focus()
+}
 
 function triggerFileInput() {
   if (isProcessing.value) return
@@ -151,8 +234,9 @@ function handleFileChange(event) {
   if (isProcessing.value) return
   const files = event.target.files
   if (files && files.length > 0) {
-    selectedFile.value = files[0]
+    selectFile(files[0])
   }
+  event.target.value = ''
 }
 
 function handleDrop(event) {
@@ -160,8 +244,16 @@ function handleDrop(event) {
   isDragOver.value = false
   const files = event.dataTransfer.files
   if (files && files.length > 0) {
-    selectedFile.value = files[0]
+    selectFile(files[0])
   }
+}
+
+function selectFile(file) {
+  selectedFile.value = file
+  decodedAudio.value = null
+  statusMessage.value = ''
+  const request = ++decodeRequest
+  void decodeSelectedFile(file, request)
 }
 
 function formatFileSize(bytes) {
@@ -176,6 +268,11 @@ function formatChannelLayout(channels) {
   if (channels === 6) return '5.1 Surround'
   if (channels === 8) return '7.1 Surround'
   return `${channels} Channels`
+}
+
+function formatDuration(seconds) {
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`
 }
 
 function audioBufferToPcm16(audioBuffer) {
@@ -195,29 +292,49 @@ function audioBufferToPcm16(audioBuffer) {
   return pcm16
 }
 
+async function decodeSelectedFile(file, request) {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext
+  if (!AudioContextClass) {
+    statusMessage.value = 'This browser does not provide audio decoding.'
+    return
+  }
+  isDecoding.value = true
+  statusMessage.value = 'Decoding audio for reuse…'
+  let audioCtx
+  try {
+    audioCtx = new AudioContextClass()
+    const decodedBuffer = await audioCtx.decodeAudioData(await file.arrayBuffer())
+    if (request !== decodeRequest) return
+    const pcm16Data = audioBufferToPcm16(decodedBuffer)
+    decodedAudio.value = {
+      pcm16Data,
+      sampleRate: decodedBuffer.sampleRate,
+      channels: decodedBuffer.numberOfChannels,
+      duration: decodedBuffer.duration,
+    }
+    statusMessage.value = 'Audio decoded and ready to encode.'
+  } catch (err) {
+    if (request === decodeRequest) statusMessage.value = 'Could not decode this audio: ' + err.message
+  } finally {
+    if (audioCtx?.close) {
+      try { await audioCtx.close() } catch {}
+    }
+    if (request === decodeRequest) isDecoding.value = false
+  }
+}
+
 async function startEncoding() {
-  if (!selectedFile.value) return
+  if (!selectedFile.value || !decodedAudio.value || isDecoding.value) return
 
   for (const player of resultPlayers.value) player.pause()
 
   isProcessing.value = true
   progress.value = 0
-  statusMessage.value = 'Decoding input audio via Web Audio API...'
+  statusMessage.value = 'Preparing Web Worker encoding task…'
 
   try {
-    const rawArrayBuffer = await selectedFile.value.arrayBuffer()
-    progress.value = 10
-
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-    const decodedBuffer = await audioCtx.decodeAudioData(rawArrayBuffer.slice(0))
-    const sampleRate = decodedBuffer.sampleRate
-    const channels = decodedBuffer.numberOfChannels
-    const pcm16Data = audioBufferToPcm16(decodedBuffer)
-    if (audioCtx.close) await audioCtx.close()
-
-    statusMessage.value = 'Preparing Web Worker encoding task...'
-    progress.value = 15
-
+    const { pcm16Data, sampleRate, channels, duration } = decodedAudio.value
+    progress.value = 5
     const workerUrl = new URL(withBase('/wasm/faac-worker.js'), window.location.origin).href
     const worker = new Worker(workerUrl)
 
@@ -233,14 +350,28 @@ async function startEncoding() {
 
         const outputBuffer = new Uint8Array(msg.encodedBytes)
         const baseName = selectedFile.value.name.replace(/\.[^/.]+$/, "")
-        const outName = `${baseName}_faac_${bitrate.value}k.m4a`
+        const profileLabel = msg.resolvedObjectType === 'he-v1' ? 'he-aac-v1' : 'aac-lc'
+        const rateLabel = msg.resolvedRateControl === 'vbr'
+          ? `vbr-q${msg.resolvedQuality}`
+          : `${msg.resolvedRateControl}-${Math.round(msg.resolvedBitrate / 1000)}k`
+        const outName = `${baseName}-${rateLabel}-${profileLabel}.m4a`
         const outBlob = new Blob([outputBuffer], { type: 'audio/mp4' })
         const url = URL.createObjectURL(outBlob)
-        const profileLabel = msg.resolvedObjectType === 'he-v1' ? 'HE-AAC v1' : 'AAC-LC'
+        const profileName = msg.resolvedObjectType === 'he-v1' ? 'HE-AAC v1' : 'AAC-LC'
 
+        const averageKbps = duration > 0 ? outputBuffer.byteLength * 8 / duration / 1000 : 0
+        const modeLabel = msg.resolvedRateControl.toUpperCase()
+        const details = [
+          {
+            label: 'Encoding',
+            value: `${profileName} · ${modeLabel} · ${msg.resolvedRateControl === 'vbr' ? `Quality ${msg.resolvedQuality}` : `Target ${Math.round(msg.resolvedBitrate / 1000)} kbps`}`,
+          },
+          { label: 'Input', value: `${sampleRate} Hz · ${formatChannelLayout(channels)} · ${formatDuration(duration)}` },
+          { label: 'Output', value: `${formatFileSize(outputBuffer.byteLength)} · ~${Math.round(averageKbps)} kbps` },
+        ]
         results.value.unshift({
           name: outName,
-          details: `${bitrate.value} kbps ABR • ${profileLabel} • ${sampleRate} Hz • ${formatChannelLayout(channels)}`,
+          details,
           url: url,
           rawBuffer: outputBuffer
         })
@@ -259,13 +390,16 @@ async function startEncoding() {
       worker.terminate()
     }
 
+    const workerPcm = pcm16Data.slice()
     worker.postMessage({
-      pcm16Data: pcm16Data.buffer,
+      pcm16Data: workerPcm.buffer,
       bitrate: bitrate.value,
+      rateControl: rateControl.value,
+      quantQuality: quantQuality.value,
       objectType: objectType.value,
       sampleRate,
       channels
-    }, [pcm16Data.buffer])
+    }, [workerPcm.buffer])
 
   } catch (err) {
     statusMessage.value = 'Error: ' + err.message
@@ -284,7 +418,7 @@ async function startEncoding() {
   background: var(--vp-c-bg-elv);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
-  padding: 1.5rem;
+  padding: clamp(1rem, 3vw, 1.5rem);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
 }
 
@@ -314,6 +448,10 @@ async function startEncoding() {
   cursor: pointer;
   transition: all 0.2s ease;
   margin-bottom: 1.25rem;
+  min-height: 7rem;
+  display: grid;
+  place-content: center;
+  gap: 0.25rem;
 }
 
 .drop-zone:focus-visible {
@@ -343,6 +481,13 @@ async function startEncoding() {
   color: #e2e8f0;
 }
 
+.source-meta {
+  display: block;
+  margin-top: 0.55rem;
+  color: #6ee7b7;
+  font-size: 0.82rem;
+}
+
 .browse-link {
   color: #34d399;
   text-decoration: underline;
@@ -358,6 +503,61 @@ async function startEncoding() {
   grid-template-columns: 1fr;
   gap: 1.25rem;
   margin-bottom: 1.25rem;
+}
+
+.control-group {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.primary-setting {
+  margin-bottom: 0.8rem;
+}
+
+.primary-setting .control-group {
+  padding: 1.15rem;
+  border-color: rgba(16, 185, 129, 0.28);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(15, 23, 42, 0.28));
+}
+
+.primary-setting .control-label {
+  font-size: 1rem;
+}
+
+.primary-setting .value-badge {
+  padding: 0.35rem 0.7rem;
+  font-size: 1rem;
+}
+
+.advanced-settings {
+  margin-bottom: 1.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.2);
+}
+
+.advanced-settings summary {
+  min-height: 2.75rem;
+  padding: 0.65rem 0.85rem;
+  color: #cbd5e1;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.advanced-settings summary span {
+  float: right;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.advanced-settings .controls-grid {
+  padding: 0 0.75rem 0.75rem;
+  margin-bottom: 0;
 }
 
 @media (min-width: 640px) {
@@ -390,13 +590,68 @@ async function startEncoding() {
   font-weight: 700;
 }
 
-.control-select {
-  background: #0f172a;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
-  color: #f8fafc;
-  padding: 0.6rem;
-  font-size: 0.9rem;
+.choice-segments {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0.25rem;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.46);
+}
+
+.choice-segment {
+  display: flex;
+  min-width: 0;
+  min-height: 3.15rem;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.12rem;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: #cbd5e1;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.35rem 0.2rem;
+  touch-action: manipulation;
+}
+
+.choice-segment span {
+  font-size: 0.83rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.choice-segment small {
+  color: #94a3b8;
+  font-size: 0.67rem;
+  line-height: 1.2;
+}
+
+.choice-segment:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.choice-segment.active {
+  border-color: rgba(16, 185, 129, 0.55);
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+}
+
+.choice-segment.active small {
+  color: #a7f3d0;
+}
+
+.choice-segment:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+}
+
+.choice-segment:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .slider-wrapper {
@@ -420,10 +675,18 @@ async function startEncoding() {
   background: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #94a3b8;
-  padding: 0.25rem 0.5rem;
+  min-height: 2.5rem;
+  min-width: 2.8rem;
+  padding: 0.35rem 0.5rem;
   border-radius: 6px;
   font-size: 0.75rem;
   cursor: pointer;
+}
+
+.control-hint {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.8rem;
 }
 
 .preset-btn:hover, .preset-btn.active {
@@ -515,8 +778,43 @@ async function startEncoding() {
 }
 
 .result-meta {
-  font-size: 0.75rem;
-  color: #64748b;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.metadata-chip {
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.metadata-label {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: #94a3b8;
+  font-size: 0.67rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .result-actions {
@@ -540,29 +838,77 @@ async function startEncoding() {
   width: 100%;
 }
 
+@media (max-width: 420px) {
+  .converter-title {
+    font-size: 1.15rem;
+  }
+
+  .drop-zone {
+    padding: 1.5rem 0.75rem;
+  }
+
+  .preset-buttons {
+    gap: 0.35rem;
+  }
+
+  .preset-btn {
+    flex: 1 0 3rem;
+  }
+}
+
 @media (min-width: 640px) {
   .audio-player {
     flex: 1;
   }
 }
 
+.result-action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.icon-action {
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
 .download-link {
   background: rgba(16, 185, 129, 0.15);
   color: #34d399;
   border: 1px solid rgba(16, 185, 129, 0.3);
-  padding: 0.35rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 700;
   text-decoration: none;
-  white-space: nowrap;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
 }
 
-.download-link:hover {
+.download-link:hover,
+.download-link:focus-visible {
   background: #10b981;
   color: #0f172a;
+}
+
+.discard-button {
+  background: rgba(248, 113, 113, 0.1);
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+
+.discard-button:hover,
+.discard-button:focus-visible {
+  background: #ef4444;
+  color: #fff;
+}
+
+.icon-action:focus-visible {
+  outline: 2px solid #e2e8f0;
+  outline-offset: 2px;
 }
 </style>

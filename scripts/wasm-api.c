@@ -59,7 +59,9 @@ void wasm_converter_close(wasm_converter *session)
 }
 
 wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
-                                    uint32_t bitrate, int object_type, int32_t *status)
+                                    uint32_t bitrate, int object_type,
+                                    int rate_control, uint32_t quant_quality,
+                                    int32_t *status)
 {
     faac_params params;
     const uint8_t *asc;
@@ -76,7 +78,9 @@ wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
         goto fail;
     params.sample_rate = sample_rate;
     params.num_channels = channels;
-    params.bit_rate = channels ? bitrate / channels : 0;
+    params.bit_rate = rate_control == FAAC_RC_VBR ? 0 : (channels ? bitrate / channels : 0);
+    params.rate_control = (enum faac_rate_control)rate_control;
+    params.quant_quality = rate_control == FAAC_RC_VBR ? quant_quality : 0;
     params.use_lfe = channels >= 6;
     if (object_type == FAAC_OBJ_HE_AAC_V1) {
         params.object_type = FAAC_OBJ_HE_AAC_V1;
@@ -145,6 +149,21 @@ uint32_t wasm_converter_object_type(const wasm_converter *session)
 uint32_t wasm_converter_frame_samples(const wasm_converter *session)
 {
     return session ? session->info.frame_samples : 0;
+}
+
+uint32_t wasm_converter_rate_control(const wasm_converter *session)
+{
+    return session ? session->info.rate_control : FAAC_RC_AUTO;
+}
+
+uint32_t wasm_converter_bit_rate(const wasm_converter *session)
+{
+    return session ? session->info.bit_rate * session->channels : 0;
+}
+
+uint32_t wasm_converter_quant_quality(const wasm_converter *session)
+{
+    return session ? session->info.quant_quality : 0;
 }
 
 int16_t *wasm_converter_input(const wasm_converter *session)

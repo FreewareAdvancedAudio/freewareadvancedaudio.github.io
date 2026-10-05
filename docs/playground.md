@@ -13,7 +13,7 @@ Encode audio to **M4A** with FAAC, listen to the result, and download it. **Your
 
 Start with a lossless WAV or FLAC supported by your browser, then try different bitrates or AAC profiles. For a repeatable quality test, follow the [listening guide](/docs/listening) and use a local encoder build with recorded settings.
 
-The demo supports **AAC-LC** and **HE-AAC v1 (SBR)**, with target average bitrates from **32 to 320 kbps**. It writes gapless playback metadata for players that support it.
+The demo supports **AAC-LC** and **HE-AAC v1 (SBR)** with **VBR quality**, **ABR average bitrate**, and **CBR constant bitrate** controls. Audio is decoded when selected and reused for each encode. Results show the resolved profile, rate mode and setting, source format, duration, output size, and approximate average bitrate. The average includes M4A container overhead, so it may differ slightly from the selected AAC bitrate. M4A output includes gapless playback metadata.
 
 ## Browser support and playback {data-icon="circle-play"}
 

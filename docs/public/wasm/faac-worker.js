@@ -17,7 +17,7 @@
  */
 
 self.onmessage = async function(e) {
-  const { pcm16Data, bitrate, objectType, sampleRate, channels } = e.data;
+  const { pcm16Data, bitrate, objectType, rateControl, quantQuality, sampleRate, channels } = e.data;
   self.postMessage({ type: 'progress', progress: 15, status: 'Initializing audio converter...' });
 
   try {
@@ -30,6 +30,12 @@ self.onmessage = async function(e) {
         throw new Error(operation + ': ' + faac.UTF8ToString(faac._wasm_converter_error(status)));
       }
     }
+    if (rateControl !== undefined && !['auto', 'vbr', 'abr', 'cbr'].includes(rateControl)) {
+      throw new Error('Choose VBR, ABR, or CBR rate control.');
+    }
+    if (rateControl === 'vbr' && (!Number.isInteger(quantQuality) || quantQuality < 1 || quantQuality > 5000)) {
+      throw new Error('VBR quality must be between 1 and 5000.');
+    }
     const statusPtr = faac._malloc(4);
     if (!statusPtr) throw new Error('Not enough memory to encode this file.');
     let session = 0;
@@ -40,12 +46,16 @@ self.onmessage = async function(e) {
       }
       self.postMessage({ type: 'progress', progress: 20, status: 'Configuring audio encoder...' });
       const numObjectType = objectType === 'he-v1' ? 5 : (objectType === 'lc' ? 2 : 0);
+      const rateMode = ({ auto: 0, vbr: 1, abr: 2, cbr: 3 })[rateControl] ?? 0;
       session = faac._wasm_converter_open(sampleRate, channels, bitrate * 1000,
-                                          numObjectType, statusPtr);
+                                          numObjectType, rateMode, quantQuality, statusPtr);
       check(faac.getValue(statusPtr, 'i32'), 'Opening encoder');
       if (!session) throw new Error('The encoder could not be initialized.');
       const resolvedObjTypeNum = faac._wasm_converter_object_type(session);
       const resolvedObjectType = resolvedObjTypeNum === 5 ? 'he-v1' : 'lc';
+      const resolvedRateControl = ['auto', 'vbr', 'abr', 'cbr'][faac._wasm_converter_rate_control(session)] || 'auto';
+      const resolvedBitrate = faac._wasm_converter_bit_rate(session);
+      const resolvedQuality = faac._wasm_converter_quant_quality(session);
       const frameSamples = faac._wasm_converter_frame_samples(session);
       const inputPtr = faac._wasm_converter_input(session);
       const totalSamples = pcmInput.length / channels;
@@ -71,15 +81,17 @@ self.onmessage = async function(e) {
       if (!encodedBytes.length) throw new Error('FAAC encoding produced no output bytes.');
       // FS buffers can have an offset; transfer only the bytes of the file.
       const output = encodedBytes.slice();
-      self.postMessage({ type: 'complete', encodedBytes: output.buffer, version: versionStr, resolvedObjectType }, [output.buffer]);
+      self.postMessage({ type: 'complete', encodedBytes: output.buffer, version: versionStr,
+        resolvedObjectType, resolvedRateControl, resolvedBitrate, resolvedQuality }, [output.buffer]);
     } finally {
       faac._wasm_converter_close(session);
       faac._free(statusPtr);
     }
   } catch (err) {
     let message = err.message || 'Conversion failed';
-    if (message.includes('importScripts') || message.includes('failed to load')) {
-      message = 'The audio converter could not load. Please reload the page and try again.';
+    const normalizedMessage = message.toLowerCase();
+    if (normalizedMessage.includes('importscripts') || normalizedMessage.includes('failed to load')) {
+      message = 'The encoder module could not load. Check that faac.js and faac.wasm are available beside the worker, then reload. (' + message + ')';
     }
     self.postMessage({ type: 'error', message });
   }

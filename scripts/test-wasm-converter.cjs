@@ -83,6 +83,11 @@ async function main() {
     { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 2, sampleRate: 48000, bitrate: 64, samples: 123 },
     { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 49152 },
     { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 2, sampleRate: 48000, bitrate: 64, samples: 49152 },
+    { objectType: 'lc', rateControl: 'vbr', quantQuality: 1, expectedRateControl: 'vbr', expectedQuality: 1, channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
+    { objectType: 'lc', rateControl: 'vbr', quantQuality: 5000, expectedRateControl: 'vbr', expectedQuality: 5000, channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
+    { objectType: 'he-v1', rateControl: 'vbr', quantQuality: 75, expectedResolved: 'he-v1', expectedRateControl: 'vbr', expectedQuality: 75, channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
+    { objectType: 'lc', rateControl: 'abr', expectedRateControl: 'abr', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
+    { objectType: 'lc', rateControl: 'cbr', expectedRateControl: 'cbr', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
   ];
   for (const settings of cases) {
     const pcm = new Int16Array(settings.samples * settings.channels);
@@ -117,6 +122,14 @@ async function main() {
     if (settings.expectedResolved) {
       assert.equal(result.resolvedObjectType, settings.expectedResolved, `Expected resolved profile ${settings.expectedResolved}`);
     }
+    const expectedRateControl = settings.expectedRateControl || (settings.bitrate ? 'abr' : 'vbr');
+    assert.equal(result.resolvedRateControl, expectedRateControl, `Expected ${expectedRateControl} rate control`);
+    if (expectedRateControl === 'vbr') {
+      assert.equal(result.resolvedBitrate, 0, 'VBR must not report a target bitrate');
+      assert.equal(result.resolvedQuality, settings.expectedQuality ?? 100, 'VBR quality must be preserved');
+    } else {
+      assert.equal(result.resolvedBitrate, settings.bitrate * 1000, 'Resolved whole-stream bitrate must match the requested target');
+    }
     const bytes = Buffer.from(result.encodedBytes);
     assert.equal(bytes.toString('ascii', 4, 8), 'ftyp');
     for (const atom of ['mdat', 'moov', 'esds']) assert.ok(bytes.includes(Buffer.from(atom)), atom);
@@ -140,20 +153,46 @@ async function main() {
     writeWav(wavPath, pcm, settings);
     if (frontend) {
       const cliPath = path.join(outputDir, name + '.cli.m4a');
-      execFileSync(frontend, ['--object-type', divisor === 2 ? 'he-aac-v1' : 'lc', '-b', String(settings.bitrate), '-o', cliPath, wavPath], { stdio: 'pipe' });
+      const rateArgs = expectedRateControl === 'vbr'
+        ? ['-q', String(settings.expectedQuality ?? 100)]
+        : ['-b', String(settings.bitrate), ...(expectedRateControl === 'cbr' ? ['--cbr'] : [])];
+      execFileSync(frontend, ['--object-type', divisor === 2 ? 'he-aac-v1' : 'lc', ...rateArgs, '-o', cliPath, wavPath], { stdio: 'pipe' });
       assert.deepEqual(fields, metadata(fs.readFileSync(cliPath)), 'WASM metadata must match the native frontend, including ASC and gapless fields');
     }
     console.log(`PASS ${name} (${bytes.length} bytes; FAAC ${result.version})`);
   }
   // Invalid settings must return the library's specific error, not fake success.
-  const messages = [];
-  const self = { FAACModule: () => createModule({ wasmBinary }), postMessage: message => messages.push(message) };
-  vm.runInNewContext(workerSource, { self, URL, Int16Array });
-  await self.onmessage({ data: { sampleRate: 100, channels: 2, bitrate: 128, objectType: 'lc', pcm16Data: new Int16Array(246).buffer } });
-  const error = messages.find(message => message.type === 'error');
-  assert.ok(error && error.message.startsWith('Opening encoder: '), 'Invalid settings must produce a specific encoder error');
-  assert.ok(!messages.some(message => message.type === 'complete'));
-  console.log('PASS invalid configuration reports a specific error');
+  for (const invalid of [
+    { sampleRate: 100, channels: 2, bitrate: 128, objectType: 'lc', pcm16Data: new Int16Array(246).buffer, message: 'Opening encoder:' },
+    { sampleRate: 48000, channels: 2, bitrate: 128, objectType: 'lc', rateControl: 'unknown', pcm16Data: new Int16Array(246).buffer, message: 'Choose VBR' },
+    { sampleRate: 48000, channels: 2, bitrate: 128, objectType: 'lc', rateControl: 'vbr', quantQuality: 5001, pcm16Data: new Int16Array(246).buffer, message: 'VBR quality' },
+  ]) {
+    const invalidMessages = [];
+    const self = { FAACModule: () => createModule({ wasmBinary }), postMessage: message => invalidMessages.push(message) };
+    vm.runInNewContext(workerSource, { self, URL, Int16Array });
+    await self.onmessage({ data: invalid });
+    const error = invalidMessages.find(message => message.type === 'error');
+    assert.ok(error && error.message.startsWith(invalid.message), `Invalid settings must report ${invalid.message}`);
+    assert.ok(!invalidMessages.some(message => message.type === 'complete'));
+  }
+  console.log('PASS invalid sample rate, rate control, and VBR quality are rejected');
+
+  const loadMessages = [];
+  const loadFailureSelf = {
+    location: { href: 'https://example.test/wasm/faac-worker.js' },
+    postMessage: message => loadMessages.push(message),
+  };
+  const loadFailureContext = vm.createContext({
+    self: loadFailureSelf,
+    URL,
+    importScripts() { throw new Error("Failed to load script 'https://example.test/wasm/faac.js'"); },
+  });
+  vm.runInContext(workerSource, loadFailureContext);
+  await loadFailureSelf.onmessage({ data: {} });
+  const loadError = loadMessages.find(message => message.type === 'error');
+  assert.ok(loadError?.message.includes('faac.js') && loadError.message.includes('faac.wasm'),
+            'Missing WASM assets must report the module paths and likely cause');
+  console.log('PASS missing WASM assets include actionable load details');
   console.log(`Outputs: ${outputDir}`);
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

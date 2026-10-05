@@ -35,7 +35,7 @@ COPY scripts/wasm-api.c /build/wasm-api.c
 RUN mkdir -p /build/out_wasm && \
     emcc -O2 /build/wasm-api.c /build/faac_src/build_wasm/libfaac/libfaac.a /build/faac_src/build_wasm/frontend/libfrontend.a \
       -I/build/faac_src/include -I/build/faac_src/frontend \
-      -s EXPORTED_FUNCTIONS='["_wasm_converter_open","_wasm_converter_object_type","_wasm_converter_frame_samples","_wasm_converter_input","_wasm_converter_encode","_wasm_converter_finish","_wasm_converter_close","_wasm_converter_error","_wasm_converter_version","_malloc","_free"]' \
+      -s EXPORTED_FUNCTIONS='["_wasm_converter_open","_wasm_converter_object_type","_wasm_converter_frame_samples","_wasm_converter_rate_control","_wasm_converter_bit_rate","_wasm_converter_quant_quality","_wasm_converter_input","_wasm_converter_encode","_wasm_converter_finish","_wasm_converter_close","_wasm_converter_error","_wasm_converter_version","_malloc","_free"]' \
       -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","getValue","setValue","FS","UTF8ToString","stringToUTF8","addFunction","removeFunction"]' \
       -s ALLOW_MEMORY_GROWTH=1 \
       -s ALLOW_TABLE_GROWTH=1 \
@@ -57,10 +57,13 @@ COPY . .
 
 # Copy compiled WASM assets from builder stage
 COPY --from=builder /build/out_wasm/ /app/docs/public/wasm/
+# Keep a copy outside the bind-mounted source tree so Docker Compose development
+# can restore the generated assets when the repository mount hides docs/public.
+COPY --from=builder /build/out_wasm/ /opt/faac-wasm/
 
 EXPOSE 5173 4173
 
-CMD ["npm", "run", "docs:dev", "--", "--host", "0.0.0.0"]
+CMD ["sh", "-lc", "cp /opt/faac-wasm/* docs/public/wasm/ && npm run docs:dev -- --host 0.0.0.0"]
 
 # Static site builder stage for production deployment
 FROM app AS site-builder
