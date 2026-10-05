@@ -2,12 +2,12 @@
   <div class="visualizer-container">
     <div
       class="rack-bezel"
+      :class="{ 'is-paused': isPaused }"
       @mousemove="handlePointerMove"
       @mouseleave="handlePointerLeave"
-      @touchstart.passive="handlePointerMove"
-      @touchmove.passive="handlePointerMove"
-      @touchend="handlePointerLeave"
-      @click="handlePointerClick"
+      @touchmove.passive="handleTouchMove"
+      @touchend="handleTouchEnd"
+      @touchcancel="handleTouchEnd"
     >
       <div class="display-window">
         <!-- 90s Hardware Stereo Equalizer Display -->
@@ -106,9 +106,16 @@
 
         <!-- Codec Hardware VFD Feature Indicators -->
         <div class="vfd-indicators">
-          <span class="vfd-tag" :class="{ highlight: isInteractive }">
-            {{ isInteractive ? 'CODEC FEATURES' : 'FAAC / FAAD2' }}
-          </span>
+          <button
+            type="button"
+            class="vfd-tag transport-toggle"
+            :class="{ highlight: isInteractive || isPaused, paused: isPaused }"
+            :aria-label="isPaused ? 'Resume visualizer animation' : 'Pause visualizer animation'"
+            @click="togglePauseResume"
+          >
+            <i class="fa-solid" :class="isPaused ? 'fa-play' : 'fa-pause'" aria-hidden="true"></i>
+            {{ isPaused ? 'RESUME' : 'PAUSE' }}
+          </button>
           <span class="vfd-tag highlight">
             {{ activeFreqTag }}
           </span>
@@ -126,11 +133,21 @@ const barBaseHeights = [120, 200, 260, 320, 360, 330, 280, 230, 160, 110, 70]
 const barScales = ref([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
 const animatedHeights = ref([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
 const isInteractive = ref(false)
+const isPaused = ref(false)
 const activeFreqTag = ref('AAC-LC & HE-AAC')
 const waveYScale = ref(1)
 
 let animFrameId = null
+let animationTimerId = null
 let clock = 0
+let animationBars = null
+let intersectionObserver = null
+let motionPreferenceQuery = null
+let isInViewport = false
+let prefersReducedMotion = false
+let pulseTimerId = null
+let idlePauseTimerId = null
+let touchInteractionTimerId = null
 
 function barGradientUrl(index) {
   if (index < 2 || index >= 8) return 'url(#bar-cyan)'
@@ -138,32 +155,163 @@ function barGradientUrl(index) {
   return 'url(#bar-purple)'
 }
 
+function canAnimate() {
+  return !isPaused.value && !isInteractive.value && !prefersReducedMotion && isInViewport && !document.hidden
+}
+
+function stopAnimation() {
+  if (animationTimerId !== null) {
+    clearTimeout(animationTimerId)
+    animationTimerId = null
+  }
+  if (animFrameId !== null) {
+    cancelAnimationFrame(animFrameId)
+    animFrameId = null
+  }
+}
+
+function clearIdlePauseTimer() {
+  if (idlePauseTimerId !== null) {
+    clearTimeout(idlePauseTimerId)
+    idlePauseTimerId = null
+  }
+}
+
+function scheduleIdlePause() {
+  clearIdlePauseTimer()
+  if (isPaused.value || prefersReducedMotion || !isInViewport || document.hidden) return
+
+  idlePauseTimerId = setTimeout(() => {
+    idlePauseTimerId = null
+    if (!document.hidden && isInViewport && !prefersReducedMotion) {
+      isPaused.value = true
+      stopAnimation()
+    }
+  }, 60_000)
+}
+
+function scheduleAnimationFrame() {
+  if (animFrameId !== null || animationTimerId !== null || !canAnimate()) return
+
+  // Cap the decorative animation at 30 fps instead of running at 60/120 Hz.
+  animationTimerId = setTimeout(() => {
+    animationTimerId = null
+    if (canAnimate()) animFrameId = requestAnimationFrame(updateSpectrumAnimation)
+  }, 1000 / 30)
+}
+
 function updateSpectrumAnimation() {
-  clock += 0.05
+  animFrameId = null
+  if (!canAnimate()) return
 
-  // Smooth stereo spectrum analyzer animation on equalizer bars
-  animatedHeights.value = barBaseHeights.map((_, i) => {
-    const freq = 1 + (i % 3) * 0.7
-    const oscillation = Math.sin(clock * freq + i * 0.8) * 0.22 + Math.cos(clock * 1.5 + i) * 0.15
-    return Math.max(0.65, 1 + oscillation)
-  })
+  clock += 0.1
+  // Keep idle motion out of Vue's render cycle.
+  if (animationBars) {
+    for (let i = 0; i < animationBars.length; i++) {
+      const freq = 1 + (i % 3) * 0.7
+      const oscillation = Math.sin(clock * freq + i * 0.8) * 0.22 + Math.cos(clock * 1.5 + i) * 0.15
+      animationBars[i].style.transform = `scaleY(${Math.max(0.65, 1 + oscillation)})`
+    }
+  }
 
-  animFrameId = requestAnimationFrame(updateSpectrumAnimation)
+  scheduleAnimationFrame()
+}
+
+function handleDocumentVisibilityChange() {
+  if (document.hidden) {
+    stopAnimation()
+    clearIdlePauseTimer()
+  } else {
+    scheduleAnimationFrame()
+    scheduleIdlePause()
+  }
+}
+
+function handleMotionPreferenceChange(event) {
+  prefersReducedMotion = event.matches
+  if (prefersReducedMotion) {
+    stopAnimation()
+    clearIdlePauseTimer()
+  } else {
+    scheduleAnimationFrame()
+    scheduleIdlePause()
+  }
 }
 
 onMounted(() => {
-  animFrameId = requestAnimationFrame(updateSpectrumAnimation)
+  const container = document.querySelector('.visualizer-container')
+  animationBars = container?.querySelectorAll('.bar') ?? null
+
+  motionPreferenceQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  prefersReducedMotion = motionPreferenceQuery.matches
+  motionPreferenceQuery.addEventListener('change', handleMotionPreferenceChange)
+  document.addEventListener('visibilitychange', handleDocumentVisibilityChange)
+
+  if ('IntersectionObserver' in window && container) {
+    intersectionObserver = new IntersectionObserver(([entry]) => {
+      isInViewport = entry.isIntersecting
+      if (isInViewport) {
+        scheduleAnimationFrame()
+        scheduleIdlePause()
+      } else {
+        stopAnimation()
+        clearIdlePauseTimer()
+      }
+    })
+    intersectionObserver.observe(container)
+  } else {
+    isInViewport = true
+    scheduleAnimationFrame()
+    scheduleIdlePause()
+  }
 })
 
 onUnmounted(() => {
-  if (animFrameId) cancelAnimationFrame(animFrameId)
+  stopAnimation()
+  clearIdlePauseTimer()
+  intersectionObserver?.disconnect()
+  motionPreferenceQuery?.removeEventListener('change', handleMotionPreferenceChange)
+  document.removeEventListener('visibilitychange', handleDocumentVisibilityChange)
+  if (pulseTimerId) clearTimeout(pulseTimerId)
+  if (touchInteractionTimerId) clearTimeout(touchInteractionTimerId)
+  animationBars = null
 })
 
+function togglePauseResume() {
+  isPaused.value = !isPaused.value
+  triggerPulseBurst()
+  if (isPaused.value) {
+    stopAnimation()
+    clearIdlePauseTimer()
+  } else {
+    scheduleAnimationFrame()
+    scheduleIdlePause()
+  }
+}
+
+function triggerPulseBurst() {
+  barScales.value = barScales.value.map(s => Math.min(1.5, s * 1.4))
+  waveYScale.value = 1.3
+  if (pulseTimerId) clearTimeout(pulseTimerId)
+  pulseTimerId = setTimeout(() => {
+    pulseTimerId = null
+    if (!isInteractive.value) {
+      waveYScale.value = 1
+      barScales.value = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    }
+  }, 1000)
+}
+
 function handlePointerMove(e) {
+  scheduleIdlePause()
+  if (!isInteractive.value) stopAnimation()
   isInteractive.value = true
   const rect = e.currentTarget.getBoundingClientRect()
-  const x = Math.max(0, Math.min(rect.width, (e.touches ? e.touches[0].clientX : e.clientX) - rect.left))
-  const y = Math.max(0, Math.min(rect.height, (e.touches ? e.touches[0].clientY : e.clientY) - rect.top))
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY
+
+  const x = Math.max(0, Math.min(rect.width, clientX - rect.left))
+  const y = Math.max(0, Math.min(rect.height, clientY - rect.top))
 
   const normalizedX = x / rect.width
   const normalizedY = 1 - (y / rect.height)
@@ -191,21 +339,29 @@ function handlePointerMove(e) {
   })
 }
 
+function handleTouchEnd() {
+  // Mobile browsers may emit compatibility mouse events after a tap. Keep the
+  // visualizer in its touch state briefly so those events cannot leave it stuck.
+  if (touchInteractionTimerId) clearTimeout(touchInteractionTimerId)
+  touchInteractionTimerId = setTimeout(() => {
+    touchInteractionTimerId = null
+    handlePointerLeave()
+  }, 500)
+}
+
 function handlePointerLeave() {
   isInteractive.value = false
   activeFreqTag.value = 'AAC-LC & HE-AAC'
   waveYScale.value = 1
   barScales.value = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+  scheduleAnimationFrame()
+  scheduleIdlePause()
 }
 
-function handlePointerClick() {
-  // Fun pulse burst on click/tap
-  barScales.value = barScales.value.map(s => Math.min(1.5, s * 1.4))
-  waveYScale.value = 1.3
-  activeFreqTag.value = '⚡ FAAC 2.2+ / FAAD2'
-  setTimeout(() => {
-    if (!isInteractive.value) handlePointerLeave()
-  }, 1000)
+function handleTouchMove(e) {
+  if (e.touches && e.touches[0]) {
+    handlePointerMove(e)
+  }
 }
 </script>
 
@@ -227,7 +383,6 @@ function handlePointerClick() {
     inset 0 1px 2px rgba(255, 255, 255, 0.1);
   width: 100%;
   max-width: 440px;
-  cursor: pointer;
   user-select: none;
   touch-action: manipulation;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
@@ -238,6 +393,15 @@ function handlePointerClick() {
   box-shadow:
     0 20px 40px -5px rgba(6, 182, 212, 0.25),
     inset 0 1px 2px rgba(255, 255, 255, 0.2);
+  outline: 2px solid #06b6d4;
+  outline-offset: 2px;
+}
+
+.rack-bezel.is-paused {
+  border-color: #f59e0b;
+  box-shadow:
+    0 15px 35px -5px rgba(245, 158, 11, 0.2),
+    inset 0 1px 2px rgba(255, 255, 255, 0.1);
 }
 
 .display-window {
@@ -301,6 +465,27 @@ function handlePointerClick() {
   white-space: nowrap;
 }
 
+.transport-toggle {
+  pointer-events: auto;
+  font: inherit;
+  cursor: pointer;
+}
+
+.transport-toggle:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rack-bezel,
+  .bar,
+  .wave-group,
+  .sine-wave-logo,
+  .vfd-tag {
+    transition: none !important;
+  }
+}
+
 @media (max-width: 640px) {
   .rack-bezel {
     padding: 6px;
@@ -334,5 +519,11 @@ function handlePointerClick() {
   color: #22d3ee;
   border-color: rgba(6, 182, 212, 0.4);
   text-shadow: 0 0 8px rgba(6, 182, 212, 0.8);
+}
+
+.vfd-tag.paused {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.4);
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
 }
 </style>
