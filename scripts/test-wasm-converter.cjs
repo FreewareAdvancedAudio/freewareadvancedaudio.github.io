@@ -53,11 +53,16 @@ function metadata(bytes) {
 }
 
 function writeWav(filename, pcm, settings) {
+  const isFloat = settings.sampleFormat === 'float';
+  const formatTag = isFloat ? 3 : 1; // 3 = WAVE_FORMAT_FLOAT, 1 = WAVE_FORMAT_PCM
+  const bitsPerSample = isFloat ? 32 : 16;
+  const blockAlign = settings.channels * (bitsPerSample / 8);
+  const byteRate = settings.sampleRate * blockAlign;
   const header = Buffer.alloc(44);
   header.write('RIFF'); header.writeUInt32LE(36 + pcm.byteLength, 4); header.write('WAVEfmt ', 8);
-  header.writeUInt32LE(16, 16); header.writeUInt16LE(1, 20); header.writeUInt16LE(settings.channels, 22);
-  header.writeUInt32LE(settings.sampleRate, 24); header.writeUInt32LE(settings.sampleRate * settings.channels * 2, 28);
-  header.writeUInt16LE(settings.channels * 2, 32); header.writeUInt16LE(16, 34);
+  header.writeUInt32LE(16, 16); header.writeUInt16LE(formatTag, 20); header.writeUInt16LE(settings.channels, 22);
+  header.writeUInt32LE(settings.sampleRate, 24); header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32); header.writeUInt16LE(bitsPerSample, 34);
   header.write('data', 36); header.writeUInt32LE(pcm.byteLength, 40);
   fs.writeFileSync(filename, Buffer.concat([header, Buffer.from(pcm.buffer)]));
 }
@@ -77,6 +82,7 @@ async function main() {
     { objectType: 'auto', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
     { objectType: 'lc', expectedResolved: 'lc', channels: 1, sampleRate: 44100, bitrate: 96, samples: 44117 },
     { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 96000, sampleFormat: 'float', bitrate: 256, samples: 96000 },
     { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 1, sampleRate: 44100, bitrate: 48, samples: 44117 },
     { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 2, sampleRate: 48000, bitrate: 64, samples: 48123 },
     { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 123 },
@@ -90,10 +96,12 @@ async function main() {
     { objectType: 'lc', rateControl: 'cbr', expectedRateControl: 'cbr', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
   ];
   for (const settings of cases) {
-    const pcm = new Int16Array(settings.samples * settings.channels);
+    const isFloat = settings.sampleFormat === 'float';
+    const pcm = isFloat ? new Float32Array(settings.samples * settings.channels) : new Int16Array(settings.samples * settings.channels);
     for (let i = 0; i < settings.samples; i++) {
       for (let ch = 0; ch < settings.channels; ch++) {
-        pcm[i * settings.channels + ch] = Math.round(12000 * Math.sin(2 * Math.PI * (440 + ch * 220) * i / settings.sampleRate));
+        const val = Math.sin(2 * Math.PI * (440 + ch * 220) * i / settings.sampleRate);
+        pcm[i * settings.channels + ch] = isFloat ? val * 0.5 : Math.round(12000 * val);
       }
     }
     const messages = [];
@@ -103,14 +111,19 @@ async function main() {
       postMessage(message) { messages.push(message); },
     };
     const context = vm.createContext({
-      self, URL, Int16Array,
+      self, URL, Int16Array, Float32Array,
       importScripts(url) {
         imported = url;
         self.FAACModule = () => createModule({ wasmBinary });
       },
     });
     vm.runInContext(workerSource, context);
-    await self.onmessage({ data: { ...settings, pcm16Data: pcm.buffer } });
+    const workerData = {
+      ...settings,
+      pcm16Data: !isFloat ? pcm.buffer : undefined,
+      pcmFloatData: isFloat ? pcm.buffer : undefined,
+    };
+    await self.onmessage({ data: workerData });
     assert.equal(imported, 'https://example.test/fork/wasm/faac.js');
     assert.equal(messages.find(message => message.type === 'error'), undefined,
                  JSON.stringify(messages.find(message => message.type === 'error')));
@@ -145,7 +158,7 @@ async function main() {
     fs.writeFileSync(path.join(outputDir, name), bytes);
     const fields = metadata(bytes);
     assert.equal(fields.timescale, Math.round(settings.sampleRate / divisor));
-    assert.equal(fields.sampleEntryRate, fields.timescale);
+    assert.equal(fields.sampleEntryRate, Math.min(65535, fields.timescale));
     assert.equal(fields.channels, settings.channels);
     assert.ok(fields.durations.every(([count, duration]) => count > 0 && duration === 1024));
     assert.equal(fields.duration, fields.durations.reduce((sum, [count, duration]) => sum + count * duration, 0));

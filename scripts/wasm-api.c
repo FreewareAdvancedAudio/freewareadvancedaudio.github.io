@@ -16,7 +16,7 @@ typedef struct {
     faac_encoder *encoder;
     faac_encoder_info info;
     uint32_t channels;
-    int16_t *input;
+    void *input;
     uint8_t *output;
     uint64_t input_samples;
     uint64_t output_samples;
@@ -61,7 +61,7 @@ void wasm_converter_close(wasm_converter *session)
 wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
                                     uint32_t bitrate, int object_type,
                                     int rate_control, uint32_t quant_quality,
-                                    int32_t *status)
+                                    int input_format, int32_t *status)
 {
     faac_params params;
     const uint8_t *asc;
@@ -90,7 +90,7 @@ wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
         params.object_type = FAAC_OBJ_AUTO;
     }
     params.output_format = FAAC_STREAM_RAW;
-    params.input_format = FAAC_INPUT_16BIT;
+    params.input_format = (input_format == FAAC_INPUT_FLOAT) ? FAAC_INPUT_FLOAT : FAAC_INPUT_16BIT;
     faac_library_info library = { .struct_size = sizeof(library) };
     *status = faac_get_library_info(&library);
     if (*status != FAAC_OK)
@@ -117,7 +117,8 @@ wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
         goto fail;
     session->channels = channels;
     session->rate_divisor = session->info.object_type == FAAC_OBJ_HE_AAC_V1 ? 2 : 1;
-    session->input = malloc((size_t)session->info.frame_samples * channels * sizeof(int16_t));
+    size_t sample_size = (params.input_format == FAAC_INPUT_FLOAT) ? sizeof(float) : sizeof(int16_t);
+    session->input = malloc((size_t)session->info.frame_samples * channels * sample_size);
     session->output = malloc(session->info.max_output_bytes);
     if (!session->input || !session->output) {
         *status = FAAC_ERR_NO_MEMORY;
@@ -166,7 +167,7 @@ uint32_t wasm_converter_quant_quality(const wasm_converter *session)
     return session ? session->info.quant_quality : 0;
 }
 
-int16_t *wasm_converter_input(const wasm_converter *session)
+void *wasm_converter_input(const wasm_converter *session)
 {
     return session ? session->input : NULL;
 }

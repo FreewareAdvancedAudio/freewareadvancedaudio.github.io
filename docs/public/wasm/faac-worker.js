@@ -17,7 +17,7 @@
  */
 
 self.onmessage = async function(e) {
-  const { pcm16Data, bitrate, objectType, rateControl, quantQuality, sampleRate, channels } = e.data;
+  const { pcm16Data, pcmFloatData, sampleFormat, bitrate, objectType, rateControl, quantQuality, sampleRate, channels } = e.data;
   self.postMessage({ type: 'progress', progress: 15, status: 'Initializing audio converter...' });
 
   try {
@@ -40,15 +40,17 @@ self.onmessage = async function(e) {
     if (!statusPtr) throw new Error('Not enough memory to encode this file.');
     let session = 0;
     try {
-      const pcmInput = new Int16Array(pcm16Data);
+      const isFloat = sampleFormat === 'float' || Boolean(pcmFloatData);
+      const pcmInput = isFloat ? new Float32Array(pcmFloatData || pcm16Data) : new Int16Array(pcm16Data);
       if (!Number.isInteger(channels) || channels < 1 || !pcmInput.length || pcmInput.length % channels) {
         throw new Error('The input audio has an invalid channel layout or no samples.');
       }
       self.postMessage({ type: 'progress', progress: 20, status: 'Configuring audio encoder...' });
       const numObjectType = objectType === 'he-v1' ? 5 : (objectType === 'lc' ? 2 : 0);
       const rateMode = ({ auto: 0, vbr: 1, abr: 2, cbr: 3 })[rateControl] ?? 0;
+      const inputFormatCode = isFloat ? 4 : 1; // 4 = FAAC_INPUT_FLOAT, 1 = FAAC_INPUT_16BIT
       session = faac._wasm_converter_open(sampleRate, channels, bitrate * 1000,
-                                          numObjectType, rateMode, quantQuality, statusPtr);
+                                          numObjectType, rateMode, quantQuality, inputFormatCode, statusPtr);
       check(faac.getValue(statusPtr, 'i32'), 'Opening encoder');
       if (!session) throw new Error('The encoder could not be initialized.');
       const resolvedObjTypeNum = faac._wasm_converter_object_type(session);
@@ -65,7 +67,11 @@ self.onmessage = async function(e) {
       while (processed < totalSamples) {
         const samples = Math.min(frameSamples, totalSamples - processed);
         const chunk = pcmInput.subarray(processed * channels, (processed + samples) * channels);
-        faac.HEAP16.set(chunk, inputPtr / 2);
+        if (isFloat) {
+          faac.HEAPF32.set(chunk, inputPtr / 4);
+        } else {
+          faac.HEAP16.set(chunk, inputPtr / 2);
+        }
         check(faac._wasm_converter_encode(session, samples * channels), 'Encoding audio');
         processed += samples;
         const progress = 20 + Math.floor((processed / totalSamples) * 75);

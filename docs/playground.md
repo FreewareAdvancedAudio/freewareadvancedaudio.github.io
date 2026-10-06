@@ -17,7 +17,7 @@ The demo supports **AAC-LC** and **HE-AAC v1 (SBR)** with **VBR quality**, **ABR
 
 ## Browser support and playback {data-icon="circle-play"}
 
-Input formats depend on your browser's audio decoder. Common inputs include WAV, MP3, FLAC, OGG, M4A, AAC, and WebM, but availability varies. Web Audio may resample the input to the browser's audio-context sample rate; results show the rate sent to the encoder. This demo converts decoded audio to 16-bit PCM before encoding.
+Input formats depend on your browser's audio decoder. Common inputs include WAV, MP3, FLAC, OGG, M4A, AAC, and WebM, but availability varies. Files are decoded and preserved at their native sample rate (e.g. 44.1 kHz, 48 kHz, or 96 kHz) and bit depth precision (16-bit, 24-bit, or 32-bit float) before encoding with FAAC.
 
 Playback depends on the browser's AAC profile support. If the preview cannot play an HE-AAC file, download it and try a compatible player. Keep your original lossless files for archiving.
 
