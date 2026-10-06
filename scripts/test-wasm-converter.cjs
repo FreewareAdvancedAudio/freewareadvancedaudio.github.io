@@ -77,6 +77,26 @@ async function main() {
   const createModule = require(modulePath);
   const wasmBinary = fs.readFileSync(path.join(wasmDir, 'faac.wasm'));
   const workerSource = fs.readFileSync(path.join(__dirname, '../docs/public/wasm/faac-worker.js'), 'utf8');
+  // A browser worker loads Emscripten once and handles multiple messages. Keep
+  // one VM and module for the whole suite instead of recompiling WASM per case.
+  const messages = [];
+  let imported;
+  let modulePromise;
+  const self = {
+    location: { href: 'https://example.test/fork/wasm/faac-worker.js' },
+    postMessage(message) { messages.push(message); },
+  };
+  const context = vm.createContext({
+    self, URL, Int16Array, Float32Array,
+    importScripts(url) {
+      imported = url;
+      self.FAACModule = () => {
+        modulePromise ||= createModule({ wasmBinary });
+        return modulePromise;
+      };
+    },
+  });
+  vm.runInContext(workerSource, context);
   const cases = [
     { objectType: 'auto', expectedResolved: 'he-v1', channels: 2, sampleRate: 44100, bitrate: 48, samples: 44117 },
     { objectType: 'auto', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
@@ -96,6 +116,7 @@ async function main() {
     { objectType: 'lc', rateControl: 'cbr', expectedRateControl: 'cbr', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
   ];
   for (const settings of cases) {
+    messages.length = 0;
     const isFloat = settings.sampleFormat === 'float';
     const pcm = isFloat ? new Float32Array(settings.samples * settings.channels) : new Int16Array(settings.samples * settings.channels);
     for (let i = 0; i < settings.samples; i++) {
@@ -104,20 +125,6 @@ async function main() {
         pcm[i * settings.channels + ch] = isFloat ? val * 0.5 : Math.round(12000 * val);
       }
     }
-    const messages = [];
-    let imported;
-    const self = {
-      location: { href: 'https://example.test/fork/wasm/faac-worker.js' },
-      postMessage(message) { messages.push(message); },
-    };
-    const context = vm.createContext({
-      self, URL, Int16Array, Float32Array,
-      importScripts(url) {
-        imported = url;
-        self.FAACModule = () => createModule({ wasmBinary });
-      },
-    });
-    vm.runInContext(workerSource, context);
     const workerData = {
       ...settings,
       pcm16Data: !isFloat ? pcm.buffer : undefined,
@@ -163,8 +170,8 @@ async function main() {
     assert.ok(fields.durations.every(([count, duration]) => count > 0 && duration === 1024));
     assert.equal(fields.duration, fields.durations.reduce((sum, [count, duration]) => sum + count * duration, 0));
     const wavPath = path.join(outputDir, name + '.wav');
-    writeWav(wavPath, pcm, settings);
     if (frontend) {
+      writeWav(wavPath, pcm, settings);
       const cliPath = path.join(outputDir, name + '.cli.m4a');
       const rateArgs = expectedRateControl === 'vbr'
         ? ['-q', String(settings.expectedQuality ?? 100)]
@@ -180,13 +187,11 @@ async function main() {
     { sampleRate: 48000, channels: 2, bitrate: 128, objectType: 'lc', rateControl: 'unknown', pcm16Data: new Int16Array(246).buffer, message: 'Choose VBR' },
     { sampleRate: 48000, channels: 2, bitrate: 128, objectType: 'lc', rateControl: 'vbr', quantQuality: 5001, pcm16Data: new Int16Array(246).buffer, message: 'VBR quality' },
   ]) {
-    const invalidMessages = [];
-    const self = { FAACModule: () => createModule({ wasmBinary }), postMessage: message => invalidMessages.push(message) };
-    vm.runInNewContext(workerSource, { self, URL, Int16Array });
+    messages.length = 0;
     await self.onmessage({ data: invalid });
-    const error = invalidMessages.find(message => message.type === 'error');
+    const error = messages.find(message => message.type === 'error');
     assert.ok(error && error.message.startsWith(invalid.message), `Invalid settings must report ${invalid.message}`);
-    assert.ok(!invalidMessages.some(message => message.type === 'complete'));
+    assert.ok(!messages.some(message => message.type === 'complete'));
   }
   console.log('PASS invalid sample rate, rate control, and VBR quality are rejected');
 

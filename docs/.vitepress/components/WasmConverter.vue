@@ -26,8 +26,7 @@
           Drag & drop <strong>an audio file</strong> (WAV, MP3, FLAC, OGG, M4A...) here, or <span class="browse-link">browse file</span>
         </div>
         <div class="drop-text" v-else>
-          <strong>Selected File:</strong> {{ selectedFile.name }} ({{ formatFileSize(selectedFile.size) }})
-          <span v-if="decodedAudio" class="source-meta"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Ready · {{ formatDuration(decodedAudio.duration) }} · {{ decodedAudio.sampleRate }} Hz · {{ formatChannelLayout(decodedAudio.channels) }} · {{ decodedAudio.bitDepth ? decodedAudio.bitDepth + '-bit' : (decodedAudio.isFloat ? '32-bit Float' : 'Native Precision') }}</span>
+          Drop another audio file here, or <span class="browse-link">browse to replace it</span>
         </div>
         <input
           type="file"
@@ -36,6 +35,38 @@
           accept="audio/*,.wav,.mp3,.flac,.ogg,.m4a,.aac,.webm,.wma"
           @change="handleFileChange"
         />
+      </div>
+
+      <!-- Original Audio Player -->
+      <div v-if="selectedFile" class="result-card original-audio-card">
+        <div class="result-info">
+          <span class="result-name">{{ selectedFile.name }}</span>
+          <div class="result-meta">
+            <span class="metadata-chip">
+              <span class="metadata-label">Source file</span>
+              {{ formatFileSize(selectedFile.size) }} · {{ selectedFile.name.split('.').pop()?.toUpperCase() || 'Audio' }}
+            </span>
+            <span class="metadata-chip">
+              <span class="metadata-label">Audio</span>
+              <template v-if="decodedAudio">{{ decodedAudio.sampleRate }} Hz · {{ formatChannelLayout(decodedAudio.channels) }} · {{ decodedAudio.bitDepth }}-bit</template>
+              <template v-else>{{ isDecoding ? 'Decoding…' : 'Waiting to decode' }}</template>
+            </span>
+            <span class="metadata-chip">
+              <span class="metadata-label">Duration</span>
+              {{ decodedAudio ? formatDuration(decodedAudio.duration) : '—' }}
+            </span>
+          </div>
+        </div>
+        <div v-if="originalAudioUrl" class="result-actions">
+          <audio
+            ref="originalPlayer"
+            controls
+            :src="originalAudioUrl"
+            class="audio-player"
+            @play="onPlayOriginal"
+            aria-label="Original audio preview"
+          ></audio>
+        </div>
       </div>
 
       <!-- Bitrate or quality is the primary control; less common choices stay available in More settings. -->
@@ -153,7 +184,7 @@
           </div>
 
           <div class="result-actions">
-            <audio ref="resultPlayers" controls :src="item.url" class="audio-player"></audio>
+            <audio ref="resultPlayers" controls :src="item.url" class="audio-player" @play="onPlayResult($event.target)"></audio>
             <div class="result-action-buttons">
               <a :href="item.url" :download="item.name" class="icon-action download-link"
                 :aria-label="`Download ${item.name}`" title="Download output">
@@ -173,11 +204,13 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { withBase } from 'vitepress'
 
 const fileInput = ref(null)
 const selectedFile = ref(null)
+const originalAudioUrl = ref(null)
+const originalPlayer = ref(null)
 const decodedAudio = ref(null)
 const isDecoding = ref(false)
 let decodeRequest = 0
@@ -204,6 +237,7 @@ const resultPlayers = ref([])
 const convertButton = ref(null)
 const discardButtons = ref([])
 const resultAnnouncement = ref('')
+let activeWorker = null
 const maxQuantQuality = computed(() => objectType.value === 'he-v1' ? 75 : 5000)
 const qualityPresets = computed(() => [20, 30, 40, 50, 60, 75, 100, 150, 200, 300, 500, 800].filter(value => value <= maxQuantQuality.value))
 
@@ -247,13 +281,72 @@ function handleDrop(event) {
   }
 }
 
+function clearResults() {
+  for (const item of results.value) {
+    if (item?.url) URL.revokeObjectURL(item.url)
+  }
+  results.value = []
+}
+
+function handleBeforeUnload(event) {
+  if (results.value.length > 0) {
+    event.preventDefault()
+    event.returnValue = ''
+  }
+}
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', handleBeforeUnload)
+  }
+})
+
 function selectFile(file) {
+  if (originalAudioUrl.value) {
+    if (originalPlayer.value) originalPlayer.value.pause()
+    URL.revokeObjectURL(originalAudioUrl.value)
+    originalAudioUrl.value = null
+  }
   selectedFile.value = file
+  originalAudioUrl.value = null
   decodedAudio.value = null
   statusMessage.value = ''
   const request = ++decodeRequest
   void decodeSelectedFile(file, request)
 }
+
+function onPlayOriginal() {
+  for (const player of resultPlayers.value) {
+    if (player && !player.paused) {
+      player.pause()
+    }
+  }
+}
+
+function onPlayResult(targetAudio) {
+  if (originalPlayer.value && !originalPlayer.value.paused) {
+    originalPlayer.value.pause()
+  }
+  for (const player of resultPlayers.value) {
+    if (player && player !== targetAudio && !player.paused) {
+      player.pause()
+    }
+  }
+}
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('beforeunload', handleBeforeUnload)
+  }
+  if (activeWorker) {
+    activeWorker.terminate()
+    activeWorker = null
+  }
+  if (originalAudioUrl.value) {
+    URL.revokeObjectURL(originalAudioUrl.value)
+  }
+  clearResults()
+})
 
 function formatFileSize(bytes) {
   if (bytes < 1024) return bytes + ' B'
@@ -344,6 +437,34 @@ function audioBufferToFloat32(audioBuffer) {
   return pcmFloat
 }
 
+function createPreviewWav(pcmData, sampleRate, channels, sampleFormat) {
+  // PCM WAV is broadly playable in native browser audio controls, even when
+  // the browser can decode the chosen source format but cannot play it.
+  const pcm = new Int16Array(pcmData.length)
+  if (sampleFormat === 'float') {
+    for (let i = 0; i < pcm.length; i++) {
+      const sample = Math.max(-32768, Math.min(32767, pcmData[i]))
+      pcm[i] = Math.round(sample)
+    }
+  } else {
+    pcm.set(pcmData)
+  }
+  const wav = new ArrayBuffer(44 + pcm.byteLength)
+  const view = new DataView(wav)
+  const write = (offset, value) => {
+    for (let i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i))
+  }
+  const blockAlign = channels * 2
+  write(0, 'RIFF'); view.setUint32(4, 36 + pcm.byteLength, true)
+  write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true); view.setUint16(22, channels, true)
+  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * blockAlign, true)
+  view.setUint16(32, blockAlign, true); view.setUint16(34, 16, true)
+  write(36, 'data'); view.setUint32(40, pcm.byteLength, true)
+  new Int16Array(wav, 44).set(pcm)
+  return URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))
+}
+
 async function decodeSelectedFile(file, request) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext
   if (!AudioContextClass) {
@@ -384,6 +505,8 @@ async function decodeSelectedFile(file, request) {
       channels: decodedBuffer.numberOfChannels,
       duration: decodedBuffer.duration,
     }
+    if (originalAudioUrl.value) URL.revokeObjectURL(originalAudioUrl.value)
+    originalAudioUrl.value = createPreviewWav(pcmData, decodedBuffer.sampleRate, decodedBuffer.numberOfChannels, sampleFormat)
     statusMessage.value = 'Audio decoded and ready to encode.'
   } catch (err) {
     if (request === decodeRequest) statusMessage.value = 'Could not decode this audio: ' + err.message
@@ -398,7 +521,8 @@ async function decodeSelectedFile(file, request) {
 async function startEncoding() {
   if (!selectedFile.value || !decodedAudio.value || isDecoding.value) return
 
-  for (const player of resultPlayers.value) player.pause()
+  if (originalPlayer.value) originalPlayer.value.pause()
+  for (const player of resultPlayers.value) player?.pause()
 
   isProcessing.value = true
   progress.value = 0
@@ -409,6 +533,7 @@ async function startEncoding() {
     progress.value = 5
     const workerUrl = new URL(withBase('/wasm/faac-worker.js'), window.location.origin).href
     const worker = new Worker(workerUrl)
+    activeWorker = worker
 
     worker.onmessage = (e) => {
       const msg = e.data
@@ -416,6 +541,7 @@ async function startEncoding() {
         progress.value = msg.progress
         statusMessage.value = msg.status
       } else if (msg.type === 'complete') {
+        activeWorker = null
         progress.value = 100
         statusMessage.value = 'FAAC M4A encoding complete!'
         isProcessing.value = false
@@ -450,6 +576,7 @@ async function startEncoding() {
 
         worker.terminate()
       } else if (msg.type === 'error') {
+        activeWorker = null
         statusMessage.value = 'Worker Error: ' + msg.message
         isProcessing.value = false
         worker.terminate()
@@ -457,6 +584,7 @@ async function startEncoding() {
     }
 
     worker.onerror = () => {
+      activeWorker = null
       statusMessage.value = 'The audio converter could not run. Please reload the page and try again.'
       isProcessing.value = false
       worker.terminate()
@@ -545,6 +673,10 @@ async function startEncoding() {
   background: rgba(16, 185, 129, 0.12);
 }
 
+.original-audio-card {
+  margin-bottom: 1.25rem;
+}
+
 .drop-icon {
   font-size: 2.25rem;
   margin-bottom: 0.5rem;
@@ -554,13 +686,6 @@ async function startEncoding() {
 .drop-text {
   font-size: 0.95rem;
   color: #e2e8f0;
-}
-
-.source-meta {
-  display: block;
-  margin-top: 0.55rem;
-  color: #6ee7b7;
-  font-size: 0.82rem;
 }
 
 .browse-link {
@@ -909,7 +1034,7 @@ async function startEncoding() {
 }
 
 .audio-player {
-  height: 36px;
+  height: 54px;
   width: 100%;
 }
 
