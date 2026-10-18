@@ -33,7 +33,8 @@ COPY scripts/wasm-api.c /build/wasm-api.c
 
 # Compile Emscripten JS/WASM FAAC output module
 RUN mkdir -p /build/out_wasm && \
-    emcc -O2 /build/wasm-api.c /build/faac_src/build_wasm/libfaac/libfaac.a /build/faac_src/build_wasm/frontend/libfrontend.a \
+    LIBS=$(find /build/faac_src/build_wasm -name "*.a" | sort | tr '\n' ' ') && \
+    emcc -O2 /build/wasm-api.c $LIBS \
       -I/build/faac_src/include -I/build/faac_src/frontend \
       -s EXPORTED_FUNCTIONS='["_wasm_converter_open","_wasm_converter_object_type","_wasm_converter_frame_samples","_wasm_converter_rate_control","_wasm_converter_bit_rate","_wasm_converter_quant_quality","_wasm_converter_input","_wasm_converter_encode","_wasm_converter_finish","_wasm_converter_close","_wasm_converter_error","_wasm_converter_version","_malloc","_free"]' \
       -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","getValue","setValue","FS","UTF8ToString","stringToUTF8","addFunction","removeFunction"]' \
