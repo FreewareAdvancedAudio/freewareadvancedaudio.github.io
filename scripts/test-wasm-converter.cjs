@@ -74,6 +74,7 @@ async function main() {
   // Emscripten emits CommonJS; isolate it from this site's type: module package.
   const modulePath = path.join(outputDir, 'faac.cjs');
   fs.copyFileSync(path.join(wasmDir, 'faac.js'), modulePath);
+  fs.copyFileSync(path.join(wasmDir, 'faac.wasm'), path.join(outputDir, 'faac.wasm'));
   const createModule = require(modulePath);
   const wasmBinary = fs.readFileSync(path.join(wasmDir, 'faac.wasm'));
   const workerSource = fs.readFileSync(path.join(__dirname, '../docs/public/wasm/faac-worker.js'), 'utf8');

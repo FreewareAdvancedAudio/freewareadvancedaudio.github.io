@@ -1,12 +1,12 @@
 # Multi-stage Dockerfile for the FAAC WebAssembly encoder and website
-FROM emscripten/emsdk:3.1.6 AS builder
+FROM emscripten/emsdk:6.0.13 AS builder
 
 WORKDIR /build
 
 # Install build dependencies and modern Meson via pip
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git ninja-build cmake nodejs npm python3-pip python3-setuptools \
-    && pip3 install --no-cache-dir meson \
+    && pip3 install --no-cache-dir --break-system-packages meson \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy FAAC git submodule repository
@@ -41,7 +41,7 @@ RUN mkdir -p /build/out_wasm && \
       -Wl,--start-group $LIBS -Wl,--end-group \
       -I/build/faac_src -I/build/faac_src/include -I/build/faac_src/frontend -I/build/faac_src/common \
       -s EXPORTED_FUNCTIONS='["_wasm_converter_open","_wasm_converter_object_type","_wasm_converter_frame_samples","_wasm_converter_rate_control","_wasm_converter_bit_rate","_wasm_converter_quant_quality","_wasm_converter_input","_wasm_converter_encode","_wasm_converter_finish","_wasm_converter_close","_wasm_converter_error","_wasm_converter_version","_malloc","_free"]' \
-      -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","getValue","setValue","FS","UTF8ToString","stringToUTF8","addFunction","removeFunction"]' \
+      -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","getValue","setValue","FS","UTF8ToString","stringToUTF8","addFunction","removeFunction","HEAP16","HEAPF32"]' \
       -s ALLOW_MEMORY_GROWTH=1 \
       -s ALLOW_TABLE_GROWTH=1 \
       -s FORCE_FILESYSTEM=1 \
