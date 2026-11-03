@@ -180,7 +180,7 @@ export default defineConfig({
             description: 'LGPL-licensed, dependency-free AAC encoder and decoder suite with a resampler and MP4 muxer.',
             programmingLanguage: 'C',
             license: 'https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html',
-            codeRepository: 'https://github.com/FreewareAdvancedAudio',
+            codeRepository: 'https://github.com/FreewareAdvancedAudio/faac',
             url: root
           },
           {
@@ -229,7 +229,7 @@ export default defineConfig({
       '/playground': docsSidebar
     },
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/FreewareAdvancedAudio' }
+      { icon: 'github', link: 'https://github.com/FreewareAdvancedAudio/faac' }
     ],
     footer: {
       message: 'Documentation & website content licensed under CC-BY-SA 4.0. WebAssembly component code licensed under AGPL-3.0.',

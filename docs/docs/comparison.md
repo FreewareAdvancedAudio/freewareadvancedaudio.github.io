@@ -49,6 +49,7 @@ Crossovers vary by encoder, sample rate and content. Test your own audio with th
 | A terminal | **`faac`** ([CLI guide](/docs/faac-cli)), FFmpeg, or **[qaac](https://github.com/nu774/qaac)** (also encodes ALAC; needs Apple's libraries for AAC). No install: the [browser converter](/playground). |
 | An Apple-platform app | **AudioToolbox** |
 | Low-delay AAC (LD, ELD) | **FDK-AAC** or Apple. Not FAAC. |
+| xHE-AAC (USAC) | **[exhale](https://gitlab.com/ecodis/exhale)**, an open-source alternative to FDK-AAC, which this page lists as decoder-only. [Patent restrictions](#patent-status-by-aac-profile) apply. Not FAAC. |
 
 ### Which AAC decoder? {#aac-decoder-choices}
 
@@ -71,7 +72,7 @@ In our benchmark, FAAC matches or beats FDK-AAC, Apple and FFmpeg on objective q
 Both target low bitrates and mixed speech and music. Check whether every player can decode them and what they cost to run.
 
 - **Opus:** choose it for voice, WebRTC, or a player you control. FAAC and FAAD3 don't do Opus. In our [October 2026 leaderboard](https://gist.github.com/nschimme/2bfb1d981ab3c388f819a627721d47ed) on the same MacBook Pro M1, Opus scored higher on objective quality than the AAC encoders but took about 7× longer to encode than FAAC. A 2011 [Hydrogenaudio listening test](https://listening-tests.hydrogenaudio.org/igorc/results.html) at 64 kbps also rated Opus above two HE-AAC encoders.
-- **xHE-AAC:** choose it for very low bitrates when your players are known to decode it, including some DRM radio. FAAC and FAAD3 don't do it; FDK-AAC and Apple decode it. Encoders are commercial or platform-specific, such as the open-source `exhale`; verify availability. We have no quality or speed data and found no published comparison; Fraunhofer claims better quality than HE-AAC at low bitrates. [Patent restrictions](https://www.via-la.com/licensing-programs/aac/) apply. See the [DRM specification](https://www.etsi.org/deliver/etsi_es/201900_201999/201980/04.03.00_50/es_201980v040300m.pdf).
+- **xHE-AAC:** choose it for very low bitrates when your players are known to decode it, including some DRM radio. FAAC and FAAD3 don't do it; FDK-AAC and Apple decode it. Encoders are commercial or platform-specific, apart from the open-source [exhale](https://gitlab.com/ecodis/exhale); verify availability. We have no quality or speed data and found no published comparison; Fraunhofer claims better quality than HE-AAC at low bitrates. [Patent restrictions](https://www.via-la.com/licensing-programs/aac/) apply. See the [DRM specification](https://www.etsi.org/deliver/etsi_es/201900_201999/201980/04.03.00_50/es_201980v040300m.pdf).
 
 Objective scores are computer estimates, not listening tests. The [leaderboard](https://gist.github.com/nschimme/2bfb1d981ab3c388f819a627721d47ed) has the numbers, scenarios and method.
 
