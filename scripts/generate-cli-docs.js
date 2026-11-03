@@ -228,6 +228,10 @@ function parseManpageToMarkdown(manContent) {
     if (listItem) {
       md.push((listItem.started ? '  ' : listItem.marker + ' ') + text);
       listItem.started = true;
+    } else if (section === 'SYNOPSIS' && md.length && md[md.length - 1] !== '' && !md[md.length - 1].startsWith('#')) {
+      // Keep one synopsis per line: Vue's template compiler drops a bare newline
+      // between two inline elements, which glued "faam tag" to "file".
+      md[md.length - 1] += ' ' + text;
     } else {
       md.push(text);
     }
