@@ -168,7 +168,7 @@
           :disabled="isProcessing || isDecoding || !decodedAudio"
           @click="startEncoding"
         >
-          <span v-if="isDecoding"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Decoding audio…</span>
+          <span v-if="isDecoding"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Decoding audio… {{ progress }}%</span>
           <span v-else-if="!isProcessing">
             <i class="fa-solid fa-file-audio" aria-hidden="true"></i> Convert to M4A
           </span>
@@ -177,9 +177,9 @@
           </span>
         </button>
 
-        <div class="progress-bar-bg" v-if="isProcessing" role="progressbar"
+        <div class="progress-bar-bg" v-if="isDecoding || isProcessing || progress === 100" role="progressbar"
              aria-label="Audio conversion" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-bar-fill" :style="{ width: progress + '%' }"></div>
+          <div class="progress-bar-fill" :style="{ transform: `scaleX(${progress / 100})` }"></div>
         </div>
 
         <div class="status-msg" role="status" aria-live="polite" v-if="statusMessage">
@@ -532,10 +532,14 @@ async function decodeSelectedFile(file, request) {
     return
   }
   isDecoding.value = true
+  progress.value = 0
   statusMessage.value = 'Decoding audio for reuse…'
+  const nextPaint = () => new Promise((resolve) => setTimeout(resolve, 0))
   let audioCtx
+  let trickle
   try {
     const fileBuffer = await file.arrayBuffer()
+    progress.value = 10
     // decodeAudioData detaches fileBuffer, so keep a copy of M4A sources for tag carry-over.
     const fileBytes = new Uint8Array(fileBuffer)
     const isM4aSource = fileBytes.length > 12 && String.fromCharCode(...fileBytes.subarray(4, 8)) === 'ftyp'
@@ -552,14 +556,24 @@ async function decodeSelectedFile(file, request) {
       audioCtx = new AudioContextClass()
     }
 
+    progress.value = 20
+    // decodeAudioData reports no progress; creep toward 70% while it runs.
+    trickle = setInterval(() => {
+      if (request === decodeRequest && progress.value < 70) progress.value += Math.max(1, Math.round((70 - progress.value) / 10))
+    }, 150)
     const decodedBuffer = await audioCtx.decodeAudioData(fileBuffer)
+    clearInterval(trickle)
     if (request !== decodeRequest) return
+    progress.value = 75
+    await nextPaint()
 
     const isHighPrecision = parsedBitDepth && parsedBitDepth > 16
     const sampleFormat = isHighPrecision ? 'float' : 'int16'
     const pcmData = isHighPrecision
       ? audioBufferToFloat32(decodedBuffer)
       : audioBufferToPcm16(decodedBuffer)
+    progress.value = 90
+    await nextPaint()
 
     decodedAudio.value = {
       pcmData,
@@ -576,10 +590,14 @@ async function decodeSelectedFile(file, request) {
   } catch (err) {
     if (request === decodeRequest) statusMessage.value = 'Could not decode this audio: ' + err.message
   } finally {
+    clearInterval(trickle)
+    if (request === decodeRequest) {
+      isDecoding.value = false
+      if (!isProcessing.value) progress.value = 0
+    }
     if (audioCtx?.close) {
       try { await audioCtx.close() } catch {}
     }
-    if (request === decodeRequest) isDecoding.value = false
   }
 }
 
@@ -595,6 +613,8 @@ async function startEncoding() {
 
   try {
     const { pcmData, sampleFormat, sampleRate, channels, duration, bitDepth, sourceM4a } = decodedAudio.value
+    // Let the bar render at 0 before advancing; otherwise a rerun jumps 100 -> 5.
+    await new Promise((resolve) => setTimeout(resolve, 200))
     progress.value = 5
     const workerUrl = new URL(withBase('/wasm/faac-worker.js'), window.location.origin).href
     const worker = new Worker(workerUrl)
@@ -1044,9 +1064,13 @@ async function startEncoding() {
 }
 
 .progress-bar-fill {
-  height: 100%;
+  display: block;
+  height: 6px;
+  width: 100%;
+  transform-origin: left center;
+  will-change: transform;
   background: linear-gradient(90deg, #10b981, #38bdf8);
-  transition: width 0.15s ease;
+  transition: transform 0.1s linear;
 }
 
 .status-msg {
