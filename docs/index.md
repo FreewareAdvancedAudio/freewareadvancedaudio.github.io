@@ -50,9 +50,9 @@ features:
 
 <BenchmarkShowcase view="speed" />
 
-FAAC encodes 4.3× faster than FDK-AAC, and FAAD3 decodes 2.4× faster. FAAD3 also ties the top overall MOS.
+FAAC encodes 4.2× faster than FDK-AAC, and FAAD3 decodes 2.4× faster. FAAD3 also ties the top overall MOS.
 
-**Benchmark snapshot · October 28, 2026 · MacBook Pro M1, 32 GB.** Encoder and decoder figures come from the same generated leaderboard. Results depend on the tested builds and hardware. See the [benchmark results and tested versions](/docs/aac-benchmark).
+**Benchmark snapshot · November 3, 2026 · MacBook Pro M1, 32 GB.** Encoder and decoder figures come from the same generated leaderboard. Results depend on the tested builds and hardware. See the [benchmark results and tested versions](/docs/aac-benchmark).
 
 ### Build only what you need {data-icon="sliders"}
 

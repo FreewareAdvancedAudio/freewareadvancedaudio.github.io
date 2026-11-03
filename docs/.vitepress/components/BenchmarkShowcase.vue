@@ -3,26 +3,26 @@ import { computed, ref } from 'vue'
 
 const props = defineProps<{ view: 'resources' | 'decoder' | 'speed' | 'quality' }>()
 
-// Published snapshot: leaderboard gist, generated 2026-10-28. Do not mix with local runs.
+// Published snapshot: leaderboard gist, generated 2026-11-03. Do not mix with local runs.
 const encoders = [
-  { name: 'FAAC', speed: 721.6 },
-  { name: 'FDK-AAC', speed: 169.2 },
-  { name: 'Apple AAC', speed: 181.8 },
-  { name: 'FFmpeg AAC', speed: 51.6 }
+  { name: 'FAAC', speed: 784.1 },
+  { name: 'FDK-AAC', speed: 187.8 },
+  { name: 'Apple AAC', speed: 184.4 },
+  { name: 'FFmpeg AAC', speed: 57.7 }
 ]
 const encoderMetrics = [
-  { key: 'speed' as const, title: 'Encoding throughput', icon: 'gauge-high', value: '722×', unit: 'realtime', summary: '4.3× the measured FDK-AAC throughput', max: 721.6, format: (n: number) => `${Math.round(n).toLocaleString('en-US')}×`, note: 'Aggregate throughput · higher is better' }
+  { key: 'speed' as const, title: 'Encoding throughput', icon: 'gauge-high', value: '784×', unit: 'realtime', summary: '4.2× the measured FDK-AAC throughput', max: 784.1, format: (n: number) => `${Math.round(n).toLocaleString('en-US')}×`, note: 'Aggregate throughput · higher is better' }
 ]
 const decoders = [
   // Lead with FAAD3; then follow the encoder card order and append decoder-only implementations.
-  { name: 'FAAD3', speed: 2120.0 },
-  { name: 'FDK-AAC', speed: 875.9 },
-  { name: 'Apple AAC', speed: 1145.7 },
-  { name: 'FFmpeg AAC', speed: 579.7 },
-  { name: 'Helix AAC', speed: 943.0 }
+  { name: 'FAAD3', speed: 2150.8 },
+  { name: 'FDK-AAC', speed: 887.9 },
+  { name: 'Apple AAC', speed: 1148.1 },
+  { name: 'FFmpeg AAC', speed: 583.3 },
+  { name: 'Helix AAC', speed: 985.8 }
 ]
 const decoderMetrics = [
-  { key: 'speed' as const, title: 'Decoding throughput', icon: 'gauge-high', value: '2,120×', unit: 'realtime', summary: '2.4× the measured FDK-AAC throughput', max: 2120.0, format: (n: number) => `${Math.round(n).toLocaleString('en-US')}×`, note: 'Aggregate throughput · higher is better' }
+  { key: 'speed' as const, title: 'Decoding throughput', icon: 'gauge-high', value: '2,151×', unit: 'realtime', summary: '2.4× the measured FDK-AAC throughput', max: 2150.8, format: (n: number) => `${Math.round(n).toLocaleString('en-US')}×`, note: 'Aggregate throughput · higher is better' }
 ]
 const metrics = computed(() => props.view === 'decoder' ? decoderMetrics : encoderMetrics)
 const implementations = computed(() => props.view === 'decoder' ? decoders : encoders)
@@ -31,7 +31,7 @@ const cards = computed(() => props.view === 'speed'
   : [{ metric: metrics.value[0], rows: implementations.value, label: '' }])
 
 // 48 kHz stereo average MOS, 16–320 kbps. Published snapshot; null means not published.
-const rates = [16, 24, 32, 40, 48, 56, 64, 80, 96, 128, 160, 192, 256, 320]
+const rates = [16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256, 320]
 const rawQualitySeries = [
   {
     name: 'FAAC',
@@ -39,8 +39,8 @@ const rawQualitySeries = [
     color: '#67e8f9',
     dash: '',
     values: {
-      lc: [2.083, 2.741, 3.578, 3.972, 4.177, 4.328, 4.469, 4.613, 4.739, 4.867, 4.926, 4.955, 4.981, 4.991],
-      he: [2.978, 3.484, 3.822, 4.128, 4.297, 4.451, 4.549, 4.678, 4.746, 4.807, 4.827, 4.832, 4.833, 4.833]
+      lc: [2.083, 3.296, 3.773, 3.972, 4.177, 4.469, 4.613, 4.739, 4.867, 4.926, 4.955, 4.981, 4.991],
+      he: [2.978, 3.484, 3.822, 4.128, 4.297, 4.549, 4.678, 4.746, 4.807, 4.827, 4.832, 4.833, 4.833]
     }
   },
   {
@@ -49,8 +49,8 @@ const rawQualitySeries = [
     color: '#c4b5fd',
     dash: '',
     values: {
-      lc: [1.710, 2.164, 2.567, 2.760, 2.951, 4.063, 4.221, 4.606, 4.718, 4.826, 4.880, 4.927, 4.953, 4.960],
-      he: [2.157, 3.321, 3.836, 4.134, 4.267, 4.440, 4.526, 4.666, 4.742, 4.815, 4.844, 4.854, 4.857, 4.860]
+      lc: [1.710, 2.164, 2.567, 2.760, 2.951, 4.221, 4.606, 4.718, 4.826, 4.880, 4.927, 4.953, 4.960],
+      he: [2.157, 3.321, 3.836, 4.134, 4.267, 4.526, 4.666, 4.742, 4.815, 4.844, 4.854, 4.857, 4.860]
     }
   },
   {
@@ -59,8 +59,8 @@ const rawQualitySeries = [
     color: '#fbbf24',
     dash: '6 3',
     values: {
-      lc: [1.487, 1.548, 2.531, 2.881, 2.875, 3.385, 3.976, 4.613, 4.710, 4.859, 4.927, 4.963, 4.983, 4.993],
-      he: [null, 2.617, 3.843, 4.109, 4.262, 4.408, 4.543, null, null, null, null, null, null, null]
+      lc: [1.487, 1.548, 2.531, 2.881, 2.875, 3.976, 4.613, 4.710, 4.859, 4.927, 4.963, 4.983, 4.993],
+      he: [null, 2.617, 3.843, 4.109, 4.262, 4.543, null, null, null, null, null, null, null]
     }
   },
   {
@@ -69,8 +69,8 @@ const rawQualitySeries = [
     color: '#94a3b8',
     dash: '2 4',
     values: {
-      lc: [2.329, 2.335, 2.373, 2.609, 3.741, 4.070, 4.306, 4.535, 4.680, 4.799, 4.883, 4.928, 4.935, 4.943],
-      he: [null, null, null, null, null, null, null, null, null, null, null, null, null, null]
+      lc: [2.329, 2.335, 2.373, 2.609, 3.741, 4.306, 4.535, 4.680, 4.799, 4.883, 4.928, 4.935, 4.943],
+      he: [null, null, null, null, null, null, null, null, null, null, null, null, null]
     }
   }
 ]
@@ -173,12 +173,12 @@ const bars = computed(() => {
   return qualitySeries
     .map(series => ({ name: series.name, color: series.color, value: series.values[selectedIndex.value] }))
     .filter(bar => bar.value !== null)
-    // Scores equal at the displayed 2-decimal precision count as tied; FAAC goes first on a tie.
-    .sort((a, b) => (Math.round((b.value as number) * 100) - Math.round((a.value as number) * 100)) || (Number(b.name === 'FAAC') - Number(a.name === 'FAAC')))
+    // Rank by the real score so the bars always agree with the line chart, even when two scores round to the same 2 decimals.
+    .sort((a, b) => (b.value as number) - (a.value as number))
     .map(bar => ({ ...bar, pct: ((bar.value as number) - 1) / 4 * 100, delta: bar.name === 'FAAC' || faac === null ? null : (bar.value as number) - faac }))
 })
 const qualityAria = computed(() => `Line chart of average MOS from ${minRate} to ${maxRate} kbps, log scale, for ${plottedSeries.value.map(series => series.name).join(', ')}. Currently selected: ${selectedRate.value} kbps. Use the arrow keys to change it.`)
-const displayScore = (score: number | null) => score === null ? '—' : (Math.round(score * 100) / 100).toFixed(2)
+const displayScore = (score: number | null) => score === null ? '—' : score.toFixed(3)
 </script>
 
 <template>
@@ -258,7 +258,7 @@ const displayScore = (score: number | null) => score === null ? '—' : (Math.ro
         <p class="zoom-title">{{ selectedRate }} kbps · bars span MOS 1.0–5.0 · best first</p>
         <div class="resource-rows">
           <div v-for="bar in bars" :key="bar.name" class="resource-row" :class="{ 'is-faac': bar.name === 'FAAC' }">
-            <div class="resource-label"><span>{{ bar.name }}</span><strong>{{ displayScore(bar.value) }}<template v-if="bar.delta !== null"> ({{ bar.delta >= 0 ? '+' : '−' }}{{ Math.abs(bar.delta).toFixed(2) }})</template></strong></div>
+            <div class="resource-label"><span>{{ bar.name }}</span><strong>{{ displayScore(bar.value) }}<template v-if="bar.delta !== null"> ({{ bar.delta >= 0 ? '+' : '−' }}{{ Math.abs(bar.delta).toFixed(3) }})</template></strong></div>
             <div class="resource-track bar-track" aria-hidden="true"><div :style="{ width: `${bar.pct}%`, background: bar.color }"></div></div>
           </div>
         </div>
