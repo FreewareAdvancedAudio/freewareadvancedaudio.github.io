@@ -60,7 +60,7 @@ Every feature is a build option: HE-AAC (SBR), HE-AAC v2 (PS), DAB frames, dynam
 
 <Esp32Showcase view="build" />
 
-## Encoding and decoding AAC in real time on ESP32 {data-icon="microchip"}
+## Every AAC profile. Real time. On an ESP32. {data-icon="microchip"}
 
 The same FAAC and FAAD libraries that lead on powerful machines also run in real time on the ESP32-S3 and the original ESP32. Even the original ESP32, without PSRAM, decodes AAC-LC and HE-AAC v1 in real time.
 

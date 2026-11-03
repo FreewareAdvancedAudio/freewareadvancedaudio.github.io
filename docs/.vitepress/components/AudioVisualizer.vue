@@ -119,7 +119,7 @@
           <span class="vfd-tag highlight">
             {{ activeFreqTag }}
           </span>
-          <span class="vfd-tag">LGPL v2.1+ / GPL v2+</span>
+          <span class="vfd-tag">LGPL v2.1+</span>
         </div>
       </div>
     </div>
@@ -134,7 +134,7 @@ const barScales = ref([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
 const animatedHeights = ref([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
 const isInteractive = ref(false)
 const isPaused = ref(false)
-const activeFreqTag = ref('AAC-LC & HE-AAC')
+const activeFreqTag = ref('AAC-LC · HE-AAC v1/v2')
 const waveYScale = ref(1)
 
 let animFrameId = null
@@ -320,12 +320,12 @@ function handlePointerMove(e) {
 
   // Highlight codec features based on interaction
   const codecFeatures = [
-    'AAC-LC & HE-AAC',
-    'ABR MODE (-b)',
-    'LGPL v2.1+ ENCODER',
-    'LGPL v2.1+ DECODER',
-    '7.1 SURROUND SOUND',
-    'ISO/IEC 14496-3'
+    'AAC-LC · HE-AAC v1/v2',
+    'VBR · ABR · CBR',
+    'FAAR RESAMPLER',
+    'FAAM MP4 MUXER',
+    '7.1 SURROUND · 8-96 kHz',
+    'ZERO DEPENDENCIES · C11'
   ]
   const bandIndex = Math.floor(normalizedX * codecFeatures.length)
   activeFreqTag.value = codecFeatures[Math.min(bandIndex, codecFeatures.length - 1)]

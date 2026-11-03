@@ -5,7 +5,7 @@ const props = defineProps<{ view: 'home' | 'build' | 'devices' | 'memory' }>()
 const metrics = [
   {
     icon: 'bolt',
-    title: 'Microcontroller ready',
+    title: 'ESP32-S3 benchmark',
     value: 'Every profile',
     unit: 'in real time',
     summary: 'AAC-LC, HE-AAC v1 and HE-AAC v2, encode and decode, on an ESP32-S3.',
