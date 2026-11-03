@@ -1,9 +1,11 @@
 import { defineConfig } from 'vitepress'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { renderBlogFeed, writeBlogFeed } from './blog.feed'
 
 const base = `/${(process.env.SITE_BASE_PATH || '/').replace(/^\/+|\/+$/g, '')}/`.replace(/^\/\/$/, '/')
 const origin = process.env.SITE_ORIGIN || 'https://freewareadvancedaudio.github.io'
+const siteTitle = 'Freeware Advanced Audio'
 
 const docsSidebar = [
   {
@@ -61,11 +63,27 @@ function faqFromMarkdown(file: string) {
 
 export default defineConfig({
   base,
-  title: 'Freeware Advanced Audio',
+  title: siteTitle,
   description: 'FAAC is an LGPL-licensed, dependency-free AAC encoder and decoder suite with a resampler and MP4 muxer, configurable at build time for fast media pipelines and embedded devices such as the ESP32.',
   titleTemplate: ':title | Freeware Advanced Audio',
   cleanUrls: true,
   vite: {
+    plugins: [{
+      // The dev server never runs buildEnd, so serve the feed from here while developing.
+      name: 'blog-feed-dev',
+      configureServer(server) {
+        server.middlewares.use(async (req, res, next) => {
+          if (!req.url?.split('?')[0].endsWith('/feed.xml')) return next()
+          try {
+            const xml = await renderBlogFeed(siteTitle, `${origin.replace(/\/$/, '')}${base}`)
+            res.setHeader('Content-Type', 'application/rss+xml; charset=utf-8')
+            res.end(xml)
+          } catch (err) {
+            next(err)
+          }
+        })
+      }
+    }],
     server: {
       watch: {
         usePolling: process.env.VITEPRESS_POLLING === '1',
@@ -101,11 +119,13 @@ export default defineConfig({
     // Redirect stubs are not indexable destinations; keep only the canonical URL in the sitemap.
     transformItems: items => items.filter(item => !/docs\/(optimization|tested-versions)$/.test(item.url))
   },
+  buildEnd: config => writeBlogFeed(config, `${origin.replace(/\/$/, '')}${base}`),
   // Generated include fragments and the WASM README are not pages.
   srcExclude: ['**/*-gen.md', 'public/**'],
   head: [
     ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}logo.svg` }],
     ['link', { rel: 'stylesheet', href: 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css' }],
+    ['link', { rel: 'alternate', type: 'application/rss+xml', title: 'Freeware Advanced Audio Blog', href: `${base}feed.xml` }],
     ['meta', { name: 'theme-color', content: '#0f172a' }],
     ['meta', { property: 'og:site_name', content: 'Freeware Advanced Audio' }],
     ['meta', { property: 'og:type', content: 'website' }],
@@ -232,7 +252,7 @@ export default defineConfig({
       { icon: 'github', link: 'https://github.com/FreewareAdvancedAudio/faac' }
     ],
     footer: {
-      message: 'Documentation & website content licensed under CC-BY-SA 4.0. WebAssembly component code licensed under AGPL-3.0.',
+      message: `<span class="footer-links" role="navigation" aria-label="Footer"><a href="${base}docs/install"><i class="fa-solid fa-download" aria-hidden="true"></i> Download</a><a href="${base}docs/faac"><i class="fa-solid fa-book" aria-hidden="true"></i> Docs</a><a href="https://github.com/FreewareAdvancedAudio/faac"><i class="fa-brands fa-github" aria-hidden="true"></i> GitHub</a><a href="${base}feed.xml"><i class="fa-solid fa-rss" aria-hidden="true"></i> RSS</a></span><span class="footer-license">Documentation &amp; website content licensed under CC-BY-SA 4.0.</span><span class="footer-license">WebAssembly component code licensed under AGPL-3.0.</span>`,
       copyright: 'Copyright © 2026 Freeware Advanced Audio Organization'
     }
   }

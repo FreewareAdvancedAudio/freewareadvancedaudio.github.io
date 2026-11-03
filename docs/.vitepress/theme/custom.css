@@ -626,3 +626,28 @@
     transform: none !important;
   }
 }
+
+.VPFooter .footer-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 8px; margin-bottom: 12px; }
+.VPFooter .footer-links a { padding: 6px 12px; border-radius: 8px; font-weight: 500; color: var(--vp-c-text-1); text-decoration: none; transition: color .2s, background-color .2s; }
+.VPFooter .footer-links a:hover { color: var(--vp-c-brand-1); background: var(--vp-c-brand-soft); }
+.VPFooter .footer-links a:focus-visible { outline: 2px solid var(--vp-c-brand-1); outline-offset: 2px; }
+.VPFooter .footer-links i { margin-right: 4px; }
+.VPFooter .footer-license { display: block; font-size: .8rem; color: var(--vp-c-text-2); }
+@media (prefers-reduced-motion: reduce) { .VPFooter .footer-links a { transition: none; } }
+
+/* Show the footer on sidebar pages too (the default theme hides it); offset it past the fixed sidebar. */
+footer.VPFooter.has-sidebar.has-sidebar { display: block; }
+@media (min-width: 960px) {
+  footer.VPFooter.has-sidebar.has-sidebar { padding-left: calc(var(--vp-sidebar-width) + 32px); }
+}
+
+/* Line the footer up with the article text: from 1280px a doc page reserves a 256px "On this page" column on the right. */
+@media (min-width: 1280px) {
+  body:has(.VPDoc.has-aside) footer.VPFooter.has-sidebar.has-sidebar { padding-right: calc(32px + 256px); }
+}
+
+/* Past 1440px VitePress caps and centres the layout (see VPContent.vue): match its side padding, plus the 32px article padding. */
+@media (min-width: 1440px) {
+  footer.VPFooter.has-sidebar.has-sidebar { padding-left: calc((100vw - var(--vp-layout-max-width)) / 2 + var(--vp-sidebar-width) + 32px); padding-right: calc((100vw - var(--vp-layout-max-width)) / 2 + 32px); }
+  body:has(.VPDoc.has-aside) footer.VPFooter.has-sidebar.has-sidebar { padding-right: calc((100vw - var(--vp-layout-max-width)) / 2 + 32px + 256px); }
+}
