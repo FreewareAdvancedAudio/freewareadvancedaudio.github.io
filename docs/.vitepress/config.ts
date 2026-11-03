@@ -121,7 +121,7 @@ export default defineConfig({
     const canonicalUrl = url.split('#')[0]
     const isHome = pageData.relativePath === 'index.md'
     const title = String(pageData.frontmatter.title || pageData.title || site.title)
-    const fullTitle = isHome || title === site.title ? title : `${title} | ${site.title}`
+    const fullTitle = isHome || title === site.title || pageData.frontmatter.titleTemplate === false ? title : `${title} | ${site.title}`
     const description = String(pageData.frontmatter.description || pageData.description || site.description)
     const image = `${root}og.jpg`
 

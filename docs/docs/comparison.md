@@ -1,92 +1,109 @@
 ---
-title: "FAAC vs FDK-AAC vs FFmpeg: Which AAC Codec?"
-description: "Compare FAAC, FAAD, FDK-AAC, Apple AudioToolbox and FFmpeg AAC by profile support (LC, HE-AAC v1/v2), software license and patent status."
+title: "Audio Codec Comparison: FAAC vs FDK-AAC, Opus, FLAC, MP3"
+description: "FAAC vs FDK-AAC, Opus, FLAC and MP3 compared by use case, bitrate, patent status and license. Pick the right audio encoder or decoder."
 pageClass: comparison-page
+titleTemplate: false
 ---
 
-# Choose an AAC Encoder or Decoder
+# Choose an Audio Encoder or Decoder
 
-Choose by **use case, hardware, required AAC profiles, and license**. FAAC covers both: the `faac` encoder and the FAAD3 decoder. Use the matrices to compare profile support.
+Find the right codec for your job, with its patent status. FAAC (AAC encoder) and FAAD3 (AAC decoder) are valid choices for some jobs, not all; this page says which.
 
-## Start with your application {data-icon="compass"}
+The FAAC project wrote this page and ran the [benchmark](/docs/aac-benchmark) it cites.
 
-| Your requirement | Start here |
-| :--- | :--- |
-| AAC/M4A output from a C application | [Choose an AAC encoder](#choose-an-aac-encoder-for-your-application) |
-| AAC playback in a C application | [Choose a decoder](#choose-a-decoder-for-your-hardware) |
-| HE-AAC v2 encoding | [Choose an AAC encoder](#choose-an-aac-encoder-for-your-application) |
-| Apple-platform AAC application | AudioToolbox; compare the [encoder](#aac-encoders) and [decoder](#aac-decoders) matrices |
-| Existing FFmpeg pipeline | Choose an AAC encoder or decoder available in your FFmpeg build; compare the [encoder](#aac-encoders) and [decoder](#aac-decoders) matrices |
-| Lossless music storage or masters | [FLAC](https://www.xiph.org/flac/); retain the original PCM information |
-| Interactive voice or WebRTC | [Opus](#xhe-aac-digital-radio-mondiale-and-opus); evaluate delay and communications requirements |
-| Low-bitrate speech and music streaming | Compare [xHE-AAC and Opus](#xhe-aac-digital-radio-mondiale-and-opus) for playback support and licensing |
-| Digital Radio Mondiale (DRM) | A DRM-aware encoder and receiver stack; see [DRM notes](#xhe-aac-digital-radio-mondiale-and-opus) |
-| Playback on MP3-only hardware | [LAME MP3 encoder](https://lame.sourceforge.io/) |
+## Which format do I need? {data-icon="compass"}
 
-**Want to hear the difference?** [Try the browser converter](/playground) with your own audio, then use the comparisons below to narrow your choice.
-
-## Choose an AAC encoder for your application {data-icon="compass"}
-
-Choose based on the profile you need and the platform you are targeting. The capability matrix below shows supported profiles and build-dependent options.
-
-| Your requirement | Encoder to evaluate |
-| :--- | :--- |
-| AAC/M4A output from a C application | [FAAC](/docs/faac) |
-| Real-time encoding on an ESP32-S3 | [FAAC](/docs/faac); see [AAC on ESP32](/docs/esp32-aac) |
-| HE-AAC v2 (Parametric Stereo) | [FAAC](/docs/faac) with Parametric Stereo enabled, FDK-AAC, or Apple AudioToolbox; see [patent notes](#patent-status-by-aac-profile) |
-| Existing FFmpeg pipeline | An AAC encoder available in your FFmpeg build |
-| Apple-platform application | AudioToolbox |
-| Digital Radio Mondiale (DRM) | A DRM-aware encoder and receiver stack; see [DRM notes](#xhe-aac-digital-radio-mondiale-and-opus) |
-
-For lossless music storage or masters, use [FLAC](https://www.xiph.org/flac/) and retain the original PCM. For interactive voice or WebRTC, evaluate Opus and its delay characteristics. For low-bitrate speech and music streaming, compare xHE-AAC and Opus for playback support and licensing. If you need playback on MP3-only hardware, use an MP3 encoder such as [LAME](https://lame.sourceforge.io/).
-
-## Choose a decoder for your hardware {data-icon="microchip"}
-
-| Your target | Decoder to evaluate | Why |
+| You need | Use | Patents |
 | :--- | :--- | :--- |
-| ESP32-S3 or another microcontroller with an FPU | [FAAD](/docs/faad) | Real-time LC and HE-AAC; stereo HE-AAC v2 is supported. See [AAC on ESP32](/docs/esp32-aac). |
-| ESP32-C6, ESP8266, or another microcontroller without an FPU | [Helix](https://github.com/earlephilhower/ESP8266Audio/blob/master/src/libhelix-aac/aacdec.c) | Recommended fixed-point decoder; stays real time where floating-point FAAD3 does not. |
-| General-purpose decoding or microcontroller with an FPU | [FAAD](/docs/faad) | C11 decoder; LGPL v2.1+. |
-| HE-AAC v2 Parametric Stereo on a constrained target | [FAAD](/docs/faad) on an FPU-equipped target; FDK-AAC (fixed-point) elsewhere | Adds PS support; verify the target build and memory budget. |
-| Existing FFmpeg application | The available libavcodec decoder | Reuse the media framework already in your pipeline. |
-| Native Apple application | AudioToolbox | Use the platform's audio APIs and query available formats. |
+| Lossless archive or masters | **[FLAC](https://xiph.org/flac/)**; ALAC if Apple-only | FLAC: royalty-free. ALAC: [Apache 2.0 source](https://macosforge.github.io/alac/). |
+| Music or general audio that plays on any device | **[AAC](#aac-encoder-and-decoder-choices)** | LC and HE-AAC v1 expired |
+| Voice calls, WebRTC, or a player you control | **[Opus](#opus-xhe-aac-and-other-alternatives)**: higher objective quality, about 7× FAAC's encode time | Royalty-free grants |
+| MP3-only hardware | **[LAME](https://lame.sourceforge.io/)** | Expired; licensing ended 2017 |
+| Listening to digital radio | DAB+ is [HE-AAC v2](https://www.worlddab.org/glossary); DRM can be xHE-AAC or HE-AAC. [Pick a decoder](#aac-decoder-choices). | HE-AAC v2 to 2030; xHE-AAC restricted |
 
-An FPU is a hardware floating-point unit. Desktop throughput does not predict microcontroller performance. See [AAC on ESP32](/docs/esp32-aac) for ESP32-specific results, and the [FAAD guide](/docs/faad) and [libfaad reference](/docs/libfaad) for build options.
+**Software license and patents are separate questions.** The LGPL covers copyright, not patents. See [patent status](#patent-status-by-aac-profile).
+
+- **Encoding for a patent-averse product:** use AAC-LC or HE-AAC v1 (FAAC is LGPL v2.1+), Opus or FLAC. Skip HE-AAC v2 until its patents expire in 2030, and skip xHE-AAC.
+- **Decoding:** FAAD3 can drop Parametric Stereo at build time (`-Ddecoder-ps=false`). HE-AAC v2 streams then play as mono ([build options](/docs/esp32-aac#trim-the-build)).
+
+## AAC encoder and decoder choices {data-icon="music"}
+
+### Which AAC profile at which bitrate? {#which-aac-profile-at-which-bitrate}
+
+| Bitrate (stereo) | Profile | Encoders | Patents |
+| :--- | :--- | :--- | :--- |
+| 128 kbps and up | **AAC-LC** | FAAC, FDK-AAC, Apple, FFmpeg `aac` | Expired |
+| 16–96 kbps | **HE-AAC v1** | FAAC, FDK-AAC, Apple. Not FFmpeg `aac`. | Expired |
+| 16–24 kbps | **HE-AAC v2** | FDK-AAC, Apple, or FAAC with `encoder-ps` (off by default) | Parametric Stereo to 2030 |
+
+Profiles are not a quality ladder; each wins in a range. These ranges come from the FAAC project's benchmark at 48 kHz stereo ([full report](https://gist.github.com/nschimme/c6a8d8e95992f94650fc2c700581be40)). At 48 kbps, FAAC scores 4.297 MOS with HE-AAC v1 and 4.177 with LC. HE-AAC v2 leads at 16 kbps for FAAC, FDK-AAC and Apple. At 24 kbps it leads for FDK-AAC and Apple, while FAAC's HE-AAC v1 scores 3.484 against 3.283 for v2.
+
+Crossovers vary by encoder, sample rate and content. Test your own audio with the [browser converter](/playground) or the [listening guide](/docs/listening).
+
+### Which AAC encoder? {#choose-an-aac-encoder-for-your-application}
+
+| Where you encode | Use |
+| :--- | :--- |
+| A C application or embedded device | **[FAAC](/docs/faac)**: 37 KB minimal encoder on ESP32 ([AAC on ESP32](/docs/esp32-aac)) |
+| Inside FFmpeg | **`libfdk_aac`** (non-free build) or **`aac_at`** (macOS) for HE-AAC. Native `aac` is LC only. For FAAC, pipe to the `faac` CLI. |
+| A terminal | **`faac`** ([CLI guide](/docs/faac-cli)), FFmpeg, or **[qaac](https://github.com/nu774/qaac)** (also encodes ALAC; needs Apple's libraries for AAC). No install: the [browser converter](/playground). |
+| An Apple-platform app | **AudioToolbox** |
+| Low-delay AAC (LD, ELD) | **FDK-AAC** or Apple. Not FAAC. |
+
+### Which AAC decoder? {#aac-decoder-choices}
+
+| Where you decode | Use |
+| :--- | :--- |
+| Microcontroller with an FPU (ESP32-S3) | **[FAAD3](/docs/faad)**: real-time LC and HE-AAC, stereo HE-AAC v2 |
+| Microcontroller without an FPU (ESP32-C6, ESP8266) | **[Helix](https://github.com/earlephilhower/ESP8266Audio/blob/master/src/libhelix-aac/aacdec.c)** (no HE-AAC v2) or FDK-AAC fixed-point. FAAD3 isn't real time without an FPU. |
+| DAB+ radio | **FAAD3** decodes DAB+'s 960-sample frames in its default build (`decoder-dab`; [libfaad reference](/docs/libfaad)). |
+| DRM radio | **FDK-AAC**, the only listed decoder with DRM and DRM+ audio transport. Not FAAD3. |
+| Desktop or an existing framework | **FAAD3**, or the framework's own decoder: FFmpeg, AudioToolbox |
+
+A radio receiver also needs demodulation and service signaling.
+
+### How good is FAAC?
+
+In our benchmark, FAAC matches or beats FDK-AAC, Apple and FFmpeg on objective quality at most bitrates, and it is the fastest of the four. FDK-AAC and Apple edge ahead at a few bitrates, by small margins. The scores are computer estimates, not listening tests, and the FAAC project ran them. See the [benchmark](/docs/aac-benchmark) for charts, numbers and method, and the [listening guide](/docs/listening) to check with your own ears.
+
+## Opus, xHE-AAC, and other alternatives {data-icon="tower-broadcast"}
+
+Both target low bitrates and mixed speech and music. Check whether every player can decode them and what they cost to run.
+
+- **Opus:** choose it for voice, WebRTC, or a player you control. FAAC and FAAD3 don't do Opus. In our [October 2026 leaderboard](https://gist.github.com/nschimme/2bfb1d981ab3c388f819a627721d47ed) on the same MacBook Pro M1, Opus scored higher on objective quality than the AAC encoders but took about 7× longer to encode than FAAC. A 2011 [Hydrogenaudio listening test](https://listening-tests.hydrogenaudio.org/igorc/results.html) at 64 kbps also rated Opus above two HE-AAC encoders.
+- **xHE-AAC:** choose it for very low bitrates when your players are known to decode it, including some DRM radio. FAAC and FAAD3 don't do it; FDK-AAC and Apple decode it. Encoders are commercial or platform-specific, such as the open-source `exhale`; verify availability. We have no quality or speed data and found no published comparison; Fraunhofer claims better quality than HE-AAC at low bitrates. [Patent restrictions](https://www.via-la.com/licensing-programs/aac/) apply. See the [DRM specification](https://www.etsi.org/deliver/etsi_es/201900_201999/201980/04.03.00_50/es_201980v040300m.pdf).
+
+Objective scores are computer estimates, not listening tests. The [leaderboard](https://gist.github.com/nschimme/2bfb1d981ab3c388f819a627721d47ed) has the numbers, scenarios and method.
 
 ## Library capabilities {data-icon="layer-group"}
 
-Use these matrices to compare profile support across encoders and decoders. Support can depend on the specific build; notes below call out the main qualifications.
+Support can depend on the specific build. Rows where no listed implementation has support are covered in the notes below.
 
 <p class="cmp-legend"><span class="cmp-yes">✓</span> Supported · <span class="cmp-partial">†</span> Build- or configuration-dependent · <span class="cmp-no">—</span> Not supported. Apple entries assume modern macOS/iOS.</p>
 
-### AAC encoders
+### AAC encoders {#aac-encoders}
 
 | Profile or extension | [FAAC](/docs/faac) | FFmpeg native | [FDK-AAC](https://github.com/mstorsjo/fdk-aac) | [Apple AudioToolbox](https://developer.apple.com/documentation/audiotoolbox) |
 | :--- | :---: | :---: | :---: | :---: |
 | AAC-LC | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> |
-| AAC Main | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> |
-| AAC SSR | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> |
 | AAC-LTP | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> |
 | HE-AAC v1 (SBR) | <span class="cmp-yes">✓</span> | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> |
-| HE-AAC v2 (SBR + PS) | <span class="cmp-partial" title="Build-dependent: requires encoder-ps">†</span> | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> |
+| HE-AAC v2 (SBR + PS) | <span class="cmp-partial" title="Requires a build with encoder-ps; off by default">†</span> | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> |
 | AAC-LD | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> |
 | AAC-ELD (optionally with SBR) | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> |
-| USAC / xHE-AAC | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> |
 | DRM / DRM+ audio framing | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> | <span class="cmp-no">—</span> |
 
-FFmpeg builds can also include FDK-AAC or Apple AudioToolbox encoders. See [FFmpeg's encoder documentation](https://ffmpeg.org/ffmpeg-codecs.html#Audio-Encoders).
+FFmpeg builds can also include FDK-AAC or Apple AudioToolbox encoders ([FFmpeg encoder documentation](https://ffmpeg.org/ffmpeg-codecs.html#Audio-Encoders)). [qaac](https://github.com/nu774/qaac)'s AAC output on Windows comes from Apple's AudioToolbox and follows the Apple column.
 
-### AAC decoders
+### AAC decoders {#aac-decoders}
 
 | Profile or extension | [FAAD](/docs/faad) | FFmpeg native | [FDK-AAC](https://github.com/mstorsjo/fdk-aac) | [Helix](https://github.com/earlephilhower/ESP8266Audio/blob/master/src/libhelix-aac/aacdec.c) | [Apple AudioToolbox](https://developer.apple.com/documentation/audiotoolbox) |
 | :--- | :---: | :---: | :---: | :---: | :---: |
 | AAC-LC | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> |
 | AAC Main | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> |
-| AAC SSR | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> |
 | AAC-LTP | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> |
 | HE-AAC v1 (SBR) | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> |
 | HE-AAC v2 (SBR + PS) | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> | <span class="cmp-yes">✓</span> | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> |
-| ER-LC / ER-LTP | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> |
 | AAC-LD | <span class="cmp-no">—</span> | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> |
 | AAC-ELD | <span class="cmp-no">—</span> | <span class="cmp-partial" title="Build- or configuration-dependent">†</span> | <span class="cmp-yes">✓</span> | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> |
 | USAC / xHE-AAC | <span class="cmp-no">—</span> | <span class="cmp-partial" title="Build- or configuration-dependent">†</span> | <span class="cmp-yes">✓</span> | <span class="cmp-no">—</span> | <span class="cmp-yes">✓</span> |
@@ -95,7 +112,9 @@ FFmpeg builds can also include FDK-AAC or Apple AudioToolbox encoders. See [FFmp
 <details>
 <summary>Profile support notes</summary>
 
-“Main,” “SSR,” and “LTP” are AAC profiles; SBR and PS extend the LC core to HE-AAC v1 and v2. FAAC encodes HE-AAC v2 only when built with `encoder-ps`. FAAD includes HE-AAC v2 decoding in its default build; PS support can be disabled at build time. FAAD3 does not decode Main, SSR, LTP, ER or DRM streams. FFmpeg ELD and USAC support depends on its build.
+No listed encoder implements AAC Main, AAC SSR or USAC/xHE-AAC, and no listed decoder implements AAC SSR or ER-LC/ER-LTP, so those rows are omitted. FAAD3 does not decode Main, SSR, LTP, ER or DRM streams. SBR and PS extend the LC core to HE-AAC v1 and v2.
+
+FAAC encodes HE-AAC v2 only when built with `encoder-ps`, which is off by default. FAAD decodes HE-AAC v2 in its default build; PS support can be disabled at build time. FFmpeg ELD and USAC support depends on its build.
 
 Profile support does not guarantee every transport, sample rate, or channel layout. Check the selected release and build. Apple rates and channel layouts depend on the requested format; see [Apple's format identifiers](https://developer.apple.com/documentation/coreaudiotypes/audio-format-identifiers).
 
@@ -103,7 +122,7 @@ Profile support does not guarantee every transport, sample rate, or channel layo
 
 For measured decoder quality, speed, and memory, see the [decoder results](/docs/aac-benchmark#aac-decoder-quality-and-speed).
 
-## Software licenses and patent rights {data-icon="scale-balanced"}
+## Software licenses {data-icon="scale-balanced"}
 
 | Implementation | Software license |
 | :--- | :--- |
@@ -113,27 +132,24 @@ For measured decoder quality, speed, and memory, see the [decoder results](/docs
 | Opus reference implementation | [Three-clause BSD license](https://www.opus-codec.org/license/); royalty-free patent licenses also apply. |
 | Helix | [RealNetworks Public Source License (RPSL)](https://github.com/earlephilhower/ESP8266Audio/blob/master/src/libhelix-aac/aacdec.c), unless separately licensed under the RealNetworks Community Source License (RCSL). |
 | FFmpeg | Build-dependent: LGPL v2.1+ by default; GPL v2+ when GPL components are enabled. See [FFmpeg's licensing guidance](https://www.ffmpeg.org/legal.html). |
+| [qaac](https://github.com/nu774/qaac) | AAC output needs Apple's proprietary CoreAudioToolbox libraries, which you supply from an Apple installer; check Apple's terms. Its ALAC encoder is cross-platform. |
 | Legacy FAAD2 | GPL v2 or later. |
 | [FAAD2 compatibility shim](https://github.com/FreewareAdvancedAudio/faad2) | GPL v2 or later; implements the `NeAACDec*` API over FAAD3. |
 | Legacy FAAC 1.x | Included ISO MPEG-4 reference code under terms distinct from the LGPL; check the exact release. |
 
-Check the license shipped with the exact version you use. Software copyright and codec patents are separate; see the patent notes below.
+Check the license shipped with the exact version you use.
 
-### Patent status by AAC profile
+## Patent status by AAC profile {#patent-status-by-aac-profile data-icon="gavel"}
 
-| Profile | Patent considerations |
+| Format or profile | Patent considerations |
 | :--- | :--- |
 | AAC-LC | The foundational patents have expired. |
 | HE-AAC v1 | The foundational patents, including Spectral Band Replication (SBR), have expired. |
 | HE-AAC v2 | Adds **Parametric Stereo**; associated patents expire in 2030. |
 | xHE-AAC | Has additional patent restrictions; check current licensing terms. |
+| MP3 | Fraunhofer and Technicolor ended their [MP3 licensing program in April 2017](https://www.engadget.com/2017/05/12/mp3-is-dead-long-live-aac/) as the patents expired. |
+| Opus | Royalty-free patent licenses accompany the [reference implementation](https://www.opus-codec.org/license/). |
+| FLAC | Xiph.Org describes [FLAC as royalty-free](https://xiph.org/flac/). |
+| ALAC | Apple released the [source](https://macosforge.github.io/alac/) under Apache 2.0 in 2011. Check patent terms for your use. |
 
-These profile distinctions apply across implementations, including FFmpeg. Patent applicability depends on jurisdiction and implementation. See the [Via Licensing Alliance AAC program](https://www.via-la.com/licensing-programs/aac/) for current HE-AAC v2 and xHE-AAC licensing information.
-
-Via LA states that it does not charge patent license fees for distributing AAC bitstreams, including broadcasts and streams. Encoder and decoder products have separate licensing considerations.
-
-## xHE-AAC, Digital Radio Mondiale, and Opus {data-icon="tower-broadcast"}
-
-For streaming or broadcast use cases beyond the profiles in the matrices, compare format support, licensing, and the full transport stack. **DRM can carry AAC with SBR/PS or xHE-AAC; FAAC does not encode xHE-AAC.** FDK-AAC supports DRM/DRM+ audio transport. A complete receiver also needs radio demodulation and service signaling. See [Fraunhofer's xHE-AAC overview](https://www.iis.fraunhofer.de/en/ff/amm/broadcast-streaming/xheaac.html) and the [DRM system specification](https://www.etsi.org/deliver/etsi_es/201900_201999/201980/04.03.00_50/es_201980v040300m.pdf).
-
-xHE-AAC and [Opus](https://opus-codec.org/) overlap in streaming uses; Opus also serves interactive voice and conferencing. Compare delay, playback support, and licensing.
+These profile distinctions apply across implementations, including FFmpeg. Patent applicability depends on jurisdiction and implementation. See the [Via Licensing Alliance AAC program](https://www.via-la.com/licensing-programs/aac/) for current HE-AAC v2 and xHE-AAC licensing information. This page is not legal advice.
