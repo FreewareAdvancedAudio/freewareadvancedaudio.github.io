@@ -28,7 +28,7 @@ RUN echo "[binaries]" > /build/emscripten.cross && \
 RUN cd /build/faac_src && \
     meson setup build_wasm --cross-file /build/emscripten.cross \
       -Ddefault_library=static -Ddecoder=false -Dfrontend=false && \
-    ninja -C build_wasm libfaac/libfaac.a libfaam/libfaam.a
+    ninja -C build_wasm libfaac/libfaac.a libfaam/libfaam.a libfaar/libfaar.a
 
 COPY scripts/wasm-api.c /build/wasm-api.c
 
@@ -40,8 +40,8 @@ RUN mkdir -p /build/out_wasm && \
       /build/faac_src/frontend/cli_io.c \
       -Wl,--start-group $LIBS -Wl,--end-group \
       -I/build/faac_src -I/build/faac_src/include -I/build/faac_src/frontend -I/build/faac_src/common \
-      -s EXPORTED_FUNCTIONS='["_wasm_converter_open","_wasm_converter_object_type","_wasm_converter_frame_samples","_wasm_converter_rate_control","_wasm_converter_bit_rate","_wasm_converter_quant_quality","_wasm_converter_input","_wasm_converter_encode","_wasm_converter_finish","_wasm_converter_close","_wasm_converter_error","_wasm_converter_version","_malloc","_free"]' \
-      -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","getValue","setValue","FS","UTF8ToString","stringToUTF8","addFunction","removeFunction","HEAP16","HEAPF32"]' \
+      -s EXPORTED_FUNCTIONS='["_wasm_converter_open","_wasm_converter_object_type","_wasm_converter_frame_samples","_wasm_converter_rate_control","_wasm_converter_bit_rate","_wasm_converter_quant_quality","_wasm_converter_sample_rate","_wasm_converter_encoder_name","_wasm_converter_read_tags","_wasm_converter_input","_wasm_converter_encode","_wasm_converter_finish","_wasm_converter_close","_wasm_converter_error","_wasm_converter_version","_malloc","_free"]' \
+      -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","getValue","setValue","FS","UTF8ToString","stringToUTF8","addFunction","removeFunction","HEAP16","HEAPF32","HEAPU8"]' \
       -s ALLOW_MEMORY_GROWTH=1 \
       -s ALLOW_TABLE_GROWTH=1 \
       -s FORCE_FILESYSTEM=1 \

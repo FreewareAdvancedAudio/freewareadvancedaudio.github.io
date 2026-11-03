@@ -1,12 +1,6 @@
 <template>
   <div class="wasm-converter-container">
     <div class="converter-card">
-      <div class="converter-header">
-        <p class="converter-subtitle">
-          Choose a file to decode it once, then compare settings and make multiple M4A encodes without decoding it again.
-        </p>
-      </div>
-
       <!-- Drag & Drop File Zone -->
       <div
         class="drop-zone"
@@ -124,7 +118,7 @@
       </div>
 
       <details class="advanced-settings" v-if="selectedFile">
-        <summary>More settings <span>{{ rateControl.toUpperCase() }} · {{ objectType === 'auto' ? 'Auto profile' : objectType === 'lc' ? 'AAC-LC' : 'HE-AAC v1' }}</span></summary>
+        <summary>More settings <span>{{ rateControl.toUpperCase() }} · {{ objectType === 'auto' ? 'Auto profile' : objectType === 'lc' ? 'AAC-LC' : 'HE-AAC v1' }} · {{ resampleMode === 'auto' ? 'Auto rate' : resampleMode === 'keep' ? 'Keep rate' : resampleHz + ' Hz' }}</span></summary>
         <div class="controls-grid">
           <div class="control-group">
             <label class="control-label" for="rate-control">Rate control</label>
@@ -133,7 +127,7 @@
                 class="choice-segment" :class="{ active: rateControl === mode.value }"
                 :aria-pressed="rateControl === mode.value" :disabled="isProcessing || isDecoding"
                 @click="rateControl = mode.value">
-                <span>{{ mode.label }}</span><small>{{ mode.hint }}</small>
+                <span>{{ mode.label }}</span><small v-if="mode.hint">{{ mode.hint }}</small>
               </button>
             </div>
           </div>
@@ -144,9 +138,24 @@
                 class="choice-segment" :class="{ active: objectType === profile.value }"
                 :aria-pressed="objectType === profile.value" :disabled="isProcessing || isDecoding"
                 @click="objectType = profile.value; normalizeQuality()">
-                <span>{{ profile.label }}</span><small>{{ profile.hint }}</small>
+                <span>{{ profile.label }}</span><small v-if="profile.hint">{{ profile.hint }}</small>
               </button>
             </div>
+          </div>
+          <div class="control-group">
+            <label class="control-label" for="sample-rate">Sample rate</label>
+            <div id="sample-rate" class="choice-segments" role="group" aria-label="Output sample rate">
+              <button v-for="mode in resampleOptions" :key="mode.value" type="button"
+                class="choice-segment" :class="{ active: resampleMode === mode.value }"
+                :aria-pressed="resampleMode === mode.value" :disabled="isProcessing || isDecoding || (mode.value === 'custom' && !customRates.length)"
+                @click="resampleMode = mode.value">
+                <span>{{ mode.label }}</span><small v-if="mode.hint">{{ mode.hint }}</small>
+              </button>
+            </div>
+            <select v-if="resampleMode === 'custom' && customRates.length" v-model.number="resampleHz"
+              class="rate-select" aria-label="Output sample rate in Hz" :disabled="isProcessing || isDecoding">
+              <option v-for="rate in customRates" :key="rate" :value="rate">{{ rate }} Hz</option>
+            </select>
           </div>
         </div>
       </details>
@@ -214,7 +223,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { withBase } from 'vitepress'
 
 const fileInput = ref(null)
@@ -233,15 +242,27 @@ const quantQuality = ref(100)
 const rateControl = ref('abr')
 const rateControlOptions = [
   { value: 'vbr', label: 'VBR', hint: 'Quality' },
-  { value: 'abr', label: 'ABR', hint: 'Average bitrate' },
-  { value: 'cbr', label: 'CBR', hint: 'Constant bitrate' },
+  { value: 'abr', label: 'ABR' },
+  { value: 'cbr', label: 'CBR' },
 ]
 const profileOptions = [
   { value: 'auto', label: 'Auto', hint: 'Recommended' },
-  { value: 'lc', label: 'AAC-LC', hint: 'Standard' },
-  { value: 'he-v1', label: 'HE-AAC v1', hint: 'SBR' },
+  { value: 'lc', label: 'AAC-LC' },
+  { value: 'he-v1', label: 'HE-AAC v1', hint: 'Low bitrates' },
 ]
 const objectType = ref('auto')
+// Mirrors the CLI's --rate <auto|keep|hz>.
+const resampleOptions = [
+  { value: 'auto', label: 'Auto', hint: 'Recommended' },
+  { value: 'keep', label: 'Keep' },
+  { value: 'custom', label: 'Custom' },
+]
+const resampleMode = ref('auto')
+const resampleHz = ref(44100)
+const customRates = computed(() => {
+  const source = decodedAudio.value?.sampleRate || 0
+  return [48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000].filter(rate => rate < source)
+})
 const isProcessing = ref(false)
 const progress = ref(0)
 const statusMessage = ref('')
@@ -253,6 +274,12 @@ const resultAnnouncement = ref('')
 let activeWorker = null
 const maxQuantQuality = computed(() => objectType.value === 'he-v1' ? 75 : 5000)
 const qualityPresets = computed(() => [20, 30, 40, 50, 60, 75, 100, 150, 200, 300, 500, 800].filter(value => value <= maxQuantQuality.value))
+
+// Keep the chosen custom rate valid for the loaded file (it must stay below the input rate).
+watch(customRates, rates => {
+  if (!rates.includes(resampleHz.value)) resampleHz.value = rates[0] || 44100
+  if (!rates.length && resampleMode.value === 'custom') resampleMode.value = 'auto'
+})
 
 function normalizeQuality() {
   if (quantQuality.value > maxQuantQuality.value) quantQuality.value = maxQuantQuality.value
@@ -462,9 +489,8 @@ function audioBufferToFloat32(audioBuffer) {
   let offset = 0
   for (let i = 0; i < length; i++) {
     for (let channel = 0; channel < numChannels; channel++) {
-      // Web Audio uses normalized [-1, 1] floats; FAAC float input uses the
-      // PCM scale used by the native frontend (16-bit full scale).
-      pcmFloat[offset++] = audioBuffer.getChannelData(channel)[i] * 32768
+      // Web Audio and FAAC_INPUT_FLOAT both use unity full scale (+-1.0).
+      pcmFloat[offset++] = audioBuffer.getChannelData(channel)[i]
     }
   }
 
@@ -477,8 +503,8 @@ function createPreviewWav(pcmData, sampleRate, channels, sampleFormat) {
   const pcm = new Int16Array(pcmData.length)
   if (sampleFormat === 'float') {
     for (let i = 0; i < pcm.length; i++) {
-      const sample = Math.max(-32768, Math.min(32767, pcmData[i]))
-      pcm[i] = Math.round(sample)
+      const sample = Math.max(-1, Math.min(1, pcmData[i]))
+      pcm[i] = Math.round(sample < 0 ? sample * 0x8000 : sample * 0x7FFF)
     }
   } else {
     pcm.set(pcmData)
@@ -510,6 +536,10 @@ async function decodeSelectedFile(file, request) {
   let audioCtx
   try {
     const fileBuffer = await file.arrayBuffer()
+    // decodeAudioData detaches fileBuffer, so keep a copy of M4A sources for tag carry-over.
+    const fileBytes = new Uint8Array(fileBuffer)
+    const isM4aSource = fileBytes.length > 12 && String.fromCharCode(...fileBytes.subarray(4, 8)) === 'ftyp'
+    const sourceM4a = isM4aSource ? fileBuffer.slice(0) : undefined
     const { sampleRate: nativeRate, bitDepth: parsedBitDepth } = parseAudioHeader(fileBuffer)
 
     if (nativeRate) {
@@ -538,6 +568,7 @@ async function decodeSelectedFile(file, request) {
       sampleRate: decodedBuffer.sampleRate,
       channels: decodedBuffer.numberOfChannels,
       duration: decodedBuffer.duration,
+      sourceM4a,
     }
     if (originalAudioUrl.value) URL.revokeObjectURL(originalAudioUrl.value)
     originalAudioUrl.value = createPreviewWav(pcmData, decodedBuffer.sampleRate, decodedBuffer.numberOfChannels, sampleFormat)
@@ -563,7 +594,7 @@ async function startEncoding() {
   statusMessage.value = 'Preparing Web Worker encoding task…'
 
   try {
-    const { pcmData, sampleFormat, sampleRate, channels, duration, bitDepth } = decodedAudio.value
+    const { pcmData, sampleFormat, sampleRate, channels, duration, bitDepth, sourceM4a } = decodedAudio.value
     progress.value = 5
     const workerUrl = new URL(withBase('/wasm/faac-worker.js'), window.location.origin).href
     const worker = new Worker(workerUrl)
@@ -599,7 +630,7 @@ async function startEncoding() {
             value: `${profileName} · ${modeLabel} · ${msg.resolvedRateControl === 'vbr' ? `Quality ${msg.resolvedQuality}` : `Target ${Math.round(msg.resolvedBitrate / 1000)} kbps`}`,
           },
           { label: 'Input', value: `${sampleRate} Hz · ${bitDepth ? bitDepth + '-bit · ' : ''}${formatChannelLayout(channels)} · ${formatDuration(duration)}` },
-          { label: 'Output', value: `${formatFileSize(outputBuffer.byteLength)} · ~${Math.round(averageKbps)} kbps` },
+          { label: 'Output', value: `${formatFileSize(outputBuffer.byteLength)} · ~${Math.round(averageKbps)} kbps${msg.resolvedSampleRate && msg.resolvedSampleRate !== sampleRate ? ` · resampled to ${msg.resolvedSampleRate} Hz` : ''}` },
         ]
         results.value.unshift({
           name: outName,
@@ -626,6 +657,7 @@ async function startEncoding() {
 
     const workerPcm = pcmData.slice()
     const isFloat = sampleFormat === 'float'
+    const m4a = sourceM4a?.slice(0)
     worker.postMessage({
       pcm16Data: !isFloat ? workerPcm.buffer : undefined,
       pcmFloatData: isFloat ? workerPcm.buffer : undefined,
@@ -635,8 +667,10 @@ async function startEncoding() {
       quantQuality: quantQuality.value,
       objectType: objectType.value,
       sampleRate,
-      channels
-    }, [workerPcm.buffer])
+      channels,
+      resampleRate: resampleMode.value === 'custom' && customRates.value.includes(resampleHz.value) ? resampleHz.value : (resampleMode.value === 'keep' ? 'keep' : 'auto'),
+      sourceM4a: m4a
+    }, [workerPcm.buffer, ...(m4a ? [m4a] : [])])
 
   } catch (err) {
     statusMessage.value = 'Error: ' + err.message
@@ -667,13 +701,6 @@ async function startEncoding() {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.converter-subtitle {
-  margin: 0 0 1.25rem 0;
-  font-size: 0.9rem;
-  color: #94a3b8;
-  line-height: 1.5;
 }
 
 .drop-zone {
@@ -863,6 +890,16 @@ async function startEncoding() {
   border-radius: 6px;
   font-size: 0.8rem;
   font-weight: 700;
+}
+
+.rate-select {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 6px;
+  background: var(--vp-c-bg);
+  color: var(--vp-c-text-1);
+  font: inherit;
 }
 
 .choice-segments {

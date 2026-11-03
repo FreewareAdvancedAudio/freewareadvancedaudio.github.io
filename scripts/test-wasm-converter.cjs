@@ -103,7 +103,18 @@ async function main() {
     { objectType: 'auto', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
     { objectType: 'lc', expectedResolved: 'lc', channels: 1, sampleRate: 44100, bitrate: 96, samples: 44117 },
     { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123 },
-    { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 96000, sampleFormat: 'float', bitrate: 256, samples: 96000 },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 96000, sampleFormat: 'float', bitrate: 256, samples: 96000, expectedRate: 48000 },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 1, sampleRate: 48000, bitrate: 18, samples: 48123, expectedRate: 32000 },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 1, sampleRate: 48000, bitrate: 18, samples: 48121, expectedRate: 32000 },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 96000, bitrate: 256, samples: 123, expectedRate: 48000 },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 96000, bitrate: 256, samples: 96123, resampleRate: 'keep' },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 1, sampleRate: 48000, bitrate: 18, samples: 48123, resampleRate: 'keep' },
+    { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123, resampleRate: 44100, expectedRate: 44100 },
+    { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 2, sampleRate: 48000, bitrate: 64, samples: 48123, resampleRate: 32000, expectedRate: 32000 },
+    { objectType: 'lc', rateControl: 'vbr', quantQuality: 100, expectedRateControl: 'vbr', expectedQuality: 100, channels: 2, sampleRate: 48000, bitrate: 128, samples: 48123, resampleRate: 24000, expectedRate: 24000 },
+    { objectType: 'auto', channels: 2, sampleRate: 96000, bitrate: 128, samples: 96123, expectedRate: 48000 },
+    { objectType: 'auto', channels: 1, sampleRate: 48000, bitrate: 18, samples: 48123 },
+    { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 1, sampleRate: 48000, bitrate: 18, samples: 48123 },
     { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 1, sampleRate: 44100, bitrate: 48, samples: 44117 },
     { objectType: 'he-v1', expectedResolved: 'he-v1', channels: 2, sampleRate: 48000, bitrate: 64, samples: 48123 },
     { objectType: 'lc', expectedResolved: 'lc', channels: 2, sampleRate: 48000, bitrate: 128, samples: 123 },
@@ -160,12 +171,20 @@ async function main() {
     assert.ok(gapless, 'Gapless metadata must be present');
     const effectiveObjectType = result.resolvedObjectType || settings.objectType;
     const divisor = effectiveObjectType === 'he-v1' ? 2 : 1;
-    assert.equal(parseInt(gapless[4], 16), Math.floor((settings.samples + Math.floor(divisor / 2)) / divisor));
+    const outRate = settings.expectedRate || settings.sampleRate;
+    assert.equal(result.resolvedSampleRate, outRate, 'Resolved output rate');
+    const expectedSource = Math.ceil(settings.samples * outRate / settings.sampleRate);
+    const expectedCount = Math.floor((expectedSource + Math.floor(divisor / 2)) / divisor);
+    // Resampling may differ from the ideal ratio by a frame or two.
+    assert.ok(Math.abs(parseInt(gapless[4], 16) - expectedCount) <= 0, 'Gapless sample count (faar guarantees ceil(in * out / in_rate))');
+    const rateText = outRate === settings.sampleRate ? `, ${outRate}Hz,` : `, ${settings.sampleRate}Hz->${outRate}Hz,`;
+    assert.ok(result.encoderTag.startsWith(`FAAC ${result.version}, `) && result.encoderTag.includes(rateText) && /, cutoff \d+Hz, (LC|HE v1)$/.test(result.encoderTag), result.encoderTag);
+    assert.ok(bytes.includes(Buffer.from(result.encoderTag)), 'Encoder tag must be written to the file');
     assert.ok(parseInt(gapless[2], 16) > 0, 'Encoder priming must be recorded');
     const name = `${settings.objectType}-${settings.channels}ch-${settings.samples}.m4a`;
     fs.writeFileSync(path.join(outputDir, name), bytes);
     const fields = metadata(bytes);
-    assert.equal(fields.timescale, Math.round(settings.sampleRate / divisor));
+    assert.equal(fields.timescale, Math.round(outRate / divisor));
     assert.equal(fields.sampleEntryRate, Math.min(65535, fields.timescale));
     assert.equal(fields.channels, settings.channels);
     assert.ok(fields.durations.every(([count, duration]) => count > 0 && duration === 1024));
@@ -182,8 +201,59 @@ async function main() {
     }
     console.log(`PASS ${name} (${bytes.length} bytes; FAAC ${result.version})`);
   }
+  // Tags carry over from an M4A source; regenerated and stale values do not.
+  {
+    const box = (name, ...parts) => {
+      const body = Buffer.concat(parts);
+      const header = Buffer.alloc(8);
+      header.writeUInt32BE(body.length + 8); header.write(name, 4, 'latin1');
+      return Buffer.concat([header, body]);
+    };
+    const data = (type, payload) => box('data', Buffer.from([0, 0, 0, type, 0, 0, 0, 0]), payload);
+    const text = (key, value) => box(key, data(1, Buffer.from(value)));
+    const free = (name, value) => box('----', box('mean', Buffer.alloc(4), Buffer.from('com.apple.iTunes')),
+      box('name', Buffer.alloc(4), Buffer.from(name)), data(1, Buffer.from(value)));
+    const ilst = box('ilst',
+      text('\xa9nam', 'Smoke Title'), text('\xa9ART', 'Smoke Artist'), text('\xa9too', 'Old Encoder 1.0'),
+      box('trkn', data(0, Buffer.from([0, 0, 0, 3, 0, 9, 0, 0]))),
+      box('covr', data(13, Buffer.from([0xff, 0xd8, 0xff, 0xd9]))),
+      free('MYTAG', 'kept'), free('iTunSMPB', ' 00000000 00000000 00000000 0000000000000001'));
+    const udta = box('udta', box('meta', Buffer.alloc(4), ilst));
+    const pcm = new Int16Array(48000 * 2);
+    for (let i = 0; i < 48000; i++) pcm[2 * i] = pcm[2 * i + 1] = Math.round(8000 * Math.sin(i / 20));
+    const base = { sampleRate: 48000, channels: 2, bitrate: 128, objectType: 'lc', pcm16Data: pcm.buffer.slice(0) };
+    messages.length = 0;
+    await self.onmessage({ data: base });
+    const plain = Buffer.from(messages.find(m => m.type === 'complete').encodedBytes);
+    // moov is the last top-level atom in the progressive output; append udta inside it.
+    let moovAt = 0;
+    while (plain.toString('ascii', moovAt + 4, moovAt + 8) !== 'moov') moovAt += plain.readUInt32BE(moovAt);
+    assert.equal(moovAt + plain.readUInt32BE(moovAt), plain.length, 'Test source needs moov last');
+    const source = Buffer.concat([plain, udta]);
+    source.writeUInt32BE(plain.readUInt32BE(moovAt) + udta.length, moovAt);
+    messages.length = 0;
+    await self.onmessage({ data: { ...base, pcm16Data: pcm.buffer.slice(0), sourceM4a: source.buffer.slice(source.byteOffset, source.byteOffset + source.length) } });
+    assert.equal(messages.find(m => m.type === 'error'), undefined);
+    const tagged = Buffer.from(messages.find(m => m.type === 'complete').encodedBytes);
+    for (const needle of ['Smoke Title', 'Smoke Artist', 'MYTAG', 'kept']) assert.ok(tagged.includes(Buffer.from(needle)), needle);
+    assert.ok(tagged.includes(Buffer.from([0xff, 0xd8, 0xff, 0xd9])), 'cover art');
+    assert.ok(!tagged.includes(Buffer.from('Old Encoder')), 'source encoder tag must not be copied');
+    assert.ok(!tagged.includes(Buffer.from('00000000 00000000 00000000 0000000000000001')), 'source iTunSMPB must not be copied');
+    assert.ok(tagged.includes(Buffer.from('trkn')), 'track number');
+    // A later untagged encode in the same module must not inherit them.
+    messages.length = 0;
+    await self.onmessage({ data: { ...base, pcm16Data: pcm.buffer.slice(0) } });
+    const clean = Buffer.from(messages.find(m => m.type === 'complete').encodedBytes);
+    for (const needle of ['Smoke Title', 'Smoke Artist', 'MYTAG']) assert.ok(!clean.includes(Buffer.from(needle)), `${needle} leaked`);
+    assert.ok(!clean.includes(Buffer.from([0xff, 0xd8, 0xff, 0xd9])), 'cover leaked');
+    fs.writeFileSync(path.join(outputDir, 'tagged.m4a'), tagged);
+    console.log('PASS M4A source tags are carried over, regenerated tags are not');
+  }
   // Invalid settings must return the library's specific error, not fake success.
   for (const invalid of [
+    { sampleRate: 48000, channels: 2, bitrate: 128, objectType: 'lc', sampleFormat: 'float', pcmFloatData: Float32Array.from({ length: 246 }, (_, i) => (i % 2 ? 1 : -1) * 16000).buffer, message: 'Float PCM must use unity' },
+    { sampleRate: 48000, channels: 2, bitrate: 128, objectType: 'lc', resampleRate: 48000, pcm16Data: new Int16Array(246).buffer, message: 'The output rate' },
+    { sampleRate: 48000, channels: 2, bitrate: 128, objectType: 'lc', resampleRate: 'bogus', pcm16Data: new Int16Array(246).buffer, message: 'Choose auto, keep' },
     { sampleRate: 100, channels: 2, bitrate: 128, objectType: 'lc', pcm16Data: new Int16Array(246).buffer, message: 'Opening encoder:' },
     { sampleRate: 48000, channels: 2, bitrate: 128, objectType: 'lc', rateControl: 'unknown', pcm16Data: new Int16Array(246).buffer, message: 'Choose VBR' },
     { sampleRate: 48000, channels: 2, bitrate: 128, objectType: 'lc', rateControl: 'vbr', quantQuality: 5001, pcm16Data: new Int16Array(246).buffer, message: 'VBR quality' },
