@@ -37,6 +37,16 @@
         />
       </div>
 
+      <!-- Opt-in demo song: a sibling of the drop zone so its click doesn't open the file picker. -->
+      <div v-if="!selectedFile" class="demo-row">
+        <span>No file handy?</span>
+        <button type="button" class="demo-btn" :disabled="isDemoLoading" @click="loadDemo">
+          <i :class="isDemoLoading ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-play'" aria-hidden="true"></i>
+          {{ isDemoLoading ? 'Downloading…' : 'Try a demo song' }}
+        </button>
+        <span v-if="demoError" class="demo-error" role="alert">{{ demoError }}</span>
+      </div>
+
       <!-- Original Audio Player -->
       <div v-if="selectedFile" class="result-card original-audio-card">
         <div class="result-info">
@@ -215,6 +225,9 @@ const decodedAudio = ref(null)
 const isDecoding = ref(false)
 let decodeRequest = 0
 const isDragOver = ref(false)
+const isDemoLoading = ref(false)
+const demoError = ref('')
+let demoRequest = 0
 const bitrate = ref(128)
 const quantQuality = ref(100)
 const rateControl = ref('abr')
@@ -301,7 +314,28 @@ onMounted(() => {
   }
 })
 
+async function loadDemo() {
+  if (isDemoLoading.value || isProcessing.value) return
+  const request = ++demoRequest
+  isDemoLoading.value = true
+  demoError.value = ''
+  try {
+    const response = await fetch(withBase('/media/pipeline-tighter.m4a'))
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const blob = await response.blob()
+    // The user picked their own file while the demo was downloading.
+    if (request !== demoRequest) return
+    selectFile(new File([blob], 'pipeline-tighter.m4a', { type: 'audio/mp4' }))
+  } catch {
+    if (request === demoRequest) demoError.value = 'Could not download the demo song. Please try again.'
+  } finally {
+    if (request === demoRequest) isDemoLoading.value = false
+  }
+}
+
 function selectFile(file) {
+  demoRequest++
+  isDemoLoading.value = false
   if (originalAudioUrl.value) {
     if (originalPlayer.value) originalPlayer.value.pause()
     URL.revokeObjectURL(originalAudioUrl.value)
@@ -671,6 +705,47 @@ async function startEncoding() {
   border-style: solid;
   border-color: #10b981;
   background: rgba(16, 185, 129, 0.12);
+}
+
+.demo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: -0.4rem 0 1.25rem;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.demo-btn {
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  border-radius: 8px;
+  background: rgba(16, 185, 129, 0.12);
+  color: #6ee7b7;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.demo-btn:hover:not(:disabled),
+.demo-btn:focus-visible {
+  background: #10b981;
+  color: #0f172a;
+}
+
+.demo-btn:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.demo-error {
+  flex-basis: 100%;
+  text-align: center;
+  color: #fca5a5;
 }
 
 .original-audio-card {

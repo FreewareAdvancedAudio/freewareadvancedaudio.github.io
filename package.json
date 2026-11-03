@@ -1,11 +1,11 @@
 {
   "name": "freeware-advanced-audio-website",
   "version": "1.0.0",
-  "description": "Official website for Freeware Advanced Audio Organization (FAAC & FAAD2)",
+  "description": "Website and documentation for FAAC, a dependency-free AAC encoder and decoder suite with a resampler and MP4 muxer",
   "type": "module",
   "scripts": {
     "docs:generate-cli": "node scripts/generate-cli-docs.js",
-    "docs:dev": "npm run docs:generate-cli && vitepress dev docs",
+    "docs:dev": "node scripts/dev-docs.js",
     "docs:build": "npm run docs:generate-cli && vitepress build docs",
     "docs:preview": "vitepress preview docs"
   },

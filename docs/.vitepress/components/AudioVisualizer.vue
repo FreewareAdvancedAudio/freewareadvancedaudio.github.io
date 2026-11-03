@@ -323,7 +323,7 @@ function handlePointerMove(e) {
     'AAC-LC & HE-AAC',
     'ABR MODE (-b)',
     'LGPL v2.1+ ENCODER',
-    'GPL v2+ DECODER',
+    'LGPL v2.1+ DECODER',
     '7.1 SURROUND SOUND',
     'ISO/IEC 14496-3'
   ]

@@ -1,165 +1,27 @@
 ---
-title: FAAC AAC Encoder Guide & C API Reference
-description: Complete guide for FAAC (LGPL v2.1+ AAC encoder). Includes CLI usage examples, M4A container output, gapless playback metadata support, and libfaac C API documentation.
+title: FAAC AAC Encoder Library Overview
+description: FAAC is an LGPL v2.1+ C AAC encoder for AAC-LC, HE-AAC v1, and build-dependent HE-AAC v2. Explore its library and CLI, supported output, and benchmark results.
 ---
 
-# FAAC AAC Encoder Guide & C API Reference
+# FAAC AAC Encoder and C Library
 
-**FAAC (Freeware Advanced Audio Coder)** is an open-source MPEG-2 and MPEG-4 AAC audio encoder licensed under **LGPL v2.1+**.
+**FAAC (Freeware Advanced Audio Coder)** encodes PCM audio as MPEG-2 or MPEG-4 AAC. Use the C library to add encoding to an application, or use the `faac` command-line tool for file conversion. Both are licensed under **LGPL v2.1 or later**.
 
-FAAC provides AAC-LC and HE-AAC v1 encoding in C. See the [AAC benchmark results](/docs/optimization) for measured quality and resource use, or the [implementation selection guide](/docs/comparison) to choose an encoder.
+## AAC encoding capabilities
 
-::: info Match the API to your build
-The C API below follows the header vendored by this website. Package-manager releases may expose an older API or lack newer features. Check your installed `faac.h`, CLI help, and release notes before using these examples.
-:::
+FAAC supports **AAC-LC** and **HE-AAC v1** encoding, and **HE-AAC v2** (SBR plus Parametric Stereo) when built with `encoder-ps`. HE-AAC v2 takes stereo input at 32 kHz or above. The library accepts PCM and returns AAC access units for an application to mux into its chosen container. The command-line tool supports common AAC file-conversion workflows, including M4A output. FAAC does not encode xHE-AAC.
 
----
+## Choose how to use FAAC
 
-## Technical Highlights {data-icon="sliders"}
-
-| Feature | Details |
+| If you want to… | Go to… |
 | :--- | :--- |
-| **License** | GNU Lesser General Public License v2.1+ (LGPL v2.1+) |
-| **Supported Profiles** | MPEG-4 AAC-LC, HE-AAC v1 (SBR) |
-| **Container Support** | Genuine ISO MP4 / M4A (`.m4a`) containers with gapless playback metadata |
-| **Rate Control** | Average Bitrate (`-b`), Variable Bitrate (`-q`), Constant Bitrate (`--cbr`) |
-| **Installation** | See [Installation Guide](/docs/install) |
-| **Full CLI Options** | See [FAAC CLI Manual Page](/docs/faac-cli) |
+| Convert audio files from a terminal | [FAAC command-line manual](/docs/faac-cli) |
+| Embed AAC encoding in a C application | [libfaac C API reference](/docs/libfaac) |
+| Build FAAC from source | [Installation guide](/docs/install) |
+| Try encoding without installing software | [Browser converter](/playground) |
 
----
+## Evaluate quality and resource use
 
-## Quick Start CLI Examples {data-icon="terminal"}
+Published results compare FAAC with other AAC encoders for quality, throughput, memory use, and whole-library build size. FAAC is also configurable at build time, so you can ship only the features you need. Results depend on the tested build and hardware; objective quality scores are not listening-test results. See the [benchmark methods, results, and tested builds](/docs/aac-benchmark).
 
-```bash
-# 1. Standard stereo M4A container encoding (128 kbps ABR - recommended default)
-faac --object-type lc -b 128 -o output.m4a input.wav
-
-# 2. Higher-bitrate M4A encoding (192 kbps ABR)
-faac --object-type lc -b 192 -o high_quality.m4a input.wav
-
-# 3. Low-bitrate streaming (64 kbps HE-AAC v1 / SBR)
-faac --object-type he-aac-v1 -b 64 -o low_bitrate.m4a input.wav
-```
-
-For complete options and flags, view the dedicated [FAAC Command-Line Manual](/docs/faac-cli).
-
----
-
-## M4A Container & Gapless Playback {data-icon="file-audio"}
-
-When wrapping raw AAC bitstreams into MP4/M4A containers (`-o filename.m4a`), FAAC automatically creates valid ISO MP4 atoms (`ftyp`, `moov`, `stsz`, `mdat`).
-
-In addition, FAAC writes iTunes-compatible gapless metadata (`iTunSMPB` box) into the container:
-* **Priming Delay (`encoder_delay`)**: Records exact samples introduced by filterbanks during initialization.
-* **Padding Samples**: Records zero padding samples added at the end of the final audio frame.
-
-Players that recognize the metadata can remove encoder priming and padding for gapless playback. Support varies by player; test the playback applications you intend to use.
-
-You can try gapless M4A container encoding live in your browser on the [browser converter](/playground).
-
----
-
-## C API Reference (`libfaac`) {data-icon="code"}
-
-Modern releases of FAAC feature a thread-safe C API. Link against `-lfaac` and include `<faac.h>`.
-
-### Integration Lifecycle
-
-```c
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <faac.h>
-
-int main(void) {
-    faac_params params;
-    faac_encoder *hEncoder = NULL;
-
-    // 1. Initialize parameter struct (zeroes memory and stamps struct_size)
-    faac_params_init(&params, sizeof(params));
-    params.sample_rate = 44100;
-    params.num_channels = 2;
-    params.bit_rate = 64000; // Bitrate per channel (64 kbps x 2 = 128 kbps stereo)
-    params.object_type = FAAC_OBJ_LOW; // AAC-LC
-    params.output_format = FAAC_STREAM_ADTS;
-    params.input_format = FAAC_INPUT_16BIT;
-
-    // 2. Open encoder instance
-    faac_status st = faac_encoder_open(&params, &hEncoder);
-    if (st != FAAC_OK) {
-        fprintf(stderr, "Encoder open failed: %s\n", faac_strerror(st));
-        return 1;
-    }
-
-    // 3. Query resolved encoder properties & gapless priming delay
-    faac_encoder_info info = { .struct_size = sizeof(info) };
-    st = faac_encoder_get_info(hEncoder, &info);
-    if (st != FAAC_OK) {
-        faac_encoder_close(&hEncoder);
-        return 1;
-    }
-
-    printf("Frame samples: %u, Max output bytes: %u, Encoder delay: %u samples\n",
-           info.frame_samples, info.max_output_bytes, info.encoder_delay);
-
-    // 4. Encode one silent frame to demonstrate buffer handling
-    uint32_t pcmSamples = info.frame_samples * params.num_channels;
-    int16_t *pcmInput = calloc(pcmSamples, sizeof(int16_t));
-    uint8_t *aacOutput = malloc(info.max_output_bytes);
-    if (!pcmInput || !aacOutput) {
-        free(pcmInput);
-        free(aacOutput);
-        faac_encoder_close(&hEncoder);
-        return 1;
-    }
-    uint32_t bytesWritten = 0;
-
-    st = faac_encoder_encode(hEncoder, pcmInput, pcmSamples, aacOutput, info.max_output_bytes, &bytesWritten);
-
-    // 5. Cleanup
-    free(pcmInput);
-    free(aacOutput);
-    faac_encoder_close(&hEncoder);
-    return st == FAAC_OK ? 0 : 1;
-}
-```
-
-This example demonstrates initialization and one encode call. A complete application reads PCM frames, writes returned packets, and flushes until no output remains. ADTS output here is an elementary AAC stream; producing M4A also requires an MP4 muxer.
-
-### Core API Functions
-
-#### `faac_params_init`
-```c
-faac_status faac_params_init(faac_params *p, uint32_t caller_size);
-```
-Zeroes parameter memory and sets `struct_size` to ensure ABI compatibility across versions.
-
-#### `faac_encoder_open`
-```c
-faac_status faac_encoder_open(const faac_params *p, faac_encoder **out);
-```
-Validates supplied configuration parameters and initializes an encoder instance handle in `*out`.
-
-#### `faac_encoder_get_info`
-```c
-faac_status faac_encoder_get_info(faac_encoder *enc, faac_encoder_info *out);
-```
-Queries resolved encoder properties, including `frame_samples`, `max_output_bytes`, and gapless priming delay (`encoder_delay`).
-
-#### `faac_encoder_encode`
-```c
-faac_status faac_encoder_encode(faac_encoder *enc,
-                                const void *in, uint32_t in_samples,
-                                uint8_t *out, uint32_t out_cap,
-                                uint32_t *bytes_written);
-```
-Encodes PCM audio samples into an AAC bitstream packet. Pass `in = NULL` or `in_samples = 0` to flush remaining buffered frames at end-of-stream.
-
-#### Gapless Playback & Priming Delay (`encoder_delay`)
-FAAC tracks exact encoder priming delay in `info.encoder_delay` (in output sample units). When muxing into MP4 containers (`.m4a`), use `encoder_delay` and padding sample counts to write gapless metadata atoms (`iTunSMPB` or edit lists), matching the gapless handling implemented in `faac` CLI.
-
-#### `faac_encoder_close`
-```c
-faac_status faac_encoder_close(faac_encoder **enc);
-```
-Destroys encoder instance and sets handle to `NULL` to guard against double-free errors.
+For ESP32-class encoding, see [AAC on ESP32](/docs/esp32-aac). For profile support, competing implementations, and licensing context, see the [encoder comparison](/docs/comparison).

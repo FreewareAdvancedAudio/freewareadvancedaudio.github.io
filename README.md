@@ -1,37 +1,46 @@
-# Freeware Advanced Audio Organization (FAAC & FAAD)
+# FAAC & FAAD
 
-Official website and technical documentation platform for **FAAC** (LGPL v2.1+ AAC Encoder) and **FAAD** (GPL v2+ / LGPL v2.1+ AAC Decoder), built with VitePress.
+Website and documentation for **FAAC**, an LGPL-licensed, dependency-free AAC encoder and decoder suite with a resampler and MP4 muxer, built with VitePress. It targets high-throughput media pipelines and microcontrollers such as the ESP32, and is configurable at build time so each project ships only the features it needs.
 
 ---
 
 ## Highlights & Features
 
-- **FAAC (Encoder)**: Cleanroom LGPL v2.1+ C11/C99 rewrite free of ISO reference code. Supports AAC-LC and HE-AAC v1 with `-b` Average Bitrate (ABR) rate control.
-- **FAAD (Decoder)**: Standalone decoder for MPEG-2/4 AAC, HE-AAC v1/v2, and up to 7.1 surround audio streams (FAAD2 GPL v2+ / FAAD3 LGPL v2.1+).
-- **Interactive Audio Playground**: Live in-browser audio encoding and decoding powered by C cross-compiled WebAssembly engines (Emscripten/Meson/CMake).
-- **Technical Documentation & Listening**: Codec selection guidance, CLI usage guides, C API references, and controlled listening guidance.
-- **PagesCMS & Decap Integration**: Native `.pages.yml` configuration for content management and blog updates.
+- **FAAC (Encoder)**: Cleanroom LGPL v2.1+ C11/C99 rewrite free of ISO reference code. Supports AAC-LC and HE-AAC v1 with VBR, ABR and CBR rate control.
+- **FAAD (Decoder)**: C11 decoder for AAC-LC and HE-AAC v1/v2, with optional multichannel support. Licensed under LGPL v2.1+.
+- **FAAM (Muxer/Demuxer)**: C11 MP4/M4A/M4B muxer, demuxer, and tag editor for AAC audio and H.264/H.265 video. Licensed under LGPL v2.1+.
+- **FAAR (Resampler)**: C11 sample rate converter for interleaved float PCM, with Fast, Good, and High quality profiles. Licensed under LGPL v2.1+.
+- **Interactive Audio Playground**: Live in-browser FAAC encoding powered by a C library cross-compiled to WebAssembly; input decoding uses browser audio support. An opt-in demo song (from the `faac-media` submodule) is available.
+- **ESP32 & Benchmarks**: A guide to AAC on ESP32 and a published speed, quality and build-size benchmark against other AAC implementations.
+- **Technical Documentation & Listening**: Codec selection guidance, install and optimization guides, CLI manuals for `faac`, `faad`, `faam` and `faar`, C API references for all four libraries, and controlled listening guidance.
+- **PagesCMS Integration**: Native `.pages.yml` configuration for content management and blog updates.
 
 ---
 
 ## Repository Structure
 
 ```
-├── .github/workflows/deploy.yml # GitHub Actions workflow for Docker site build & GH Pages deployment
-├── .gitignore                   # Ignore rules for build output, WASM binaries & generated CLI docs
-├── .gitmodules                  # Git submodule configuration for vendor/faac & vendor/faad2
+├── .github/                     # deploy.yml (Docker site build & GH Pages deployment), dependabot.yml
+├── .dockerignore                # Docker build context exclusions
+├── .gitignore                   # Ignore rules for build output, WASM binaries & generated reference docs
+├── .gitmodules                  # Submodules: vendor/faac (source) and vendor/faac-media (demo audio)
 ├── .pages.yml                   # PagesCMS schema configuration
-├── Dockerfile                   # Multi-stage build compiling FAAC & FAAD C libraries to WASM + VitePress site
-├── docker-compose.yml           # Docker Compose setup
-├── scripts/                     # Utility scripts (generate-cli-docs.js)
-├── vendor/                      # Submodules for upstream FAAC and FAAD2 repositories
+├── Dockerfile                   # Multi-stage build compiling FAAC to WASM + VitePress site
+├── docker-compose.yml           # Docker Compose setup (dev 5173, preview 4173)
+├── LICENSE
+├── scripts/                     # generate-cli-docs.js, dev-docs.js, test-wasm-converter.cjs, wasm-api.c
+├── vendor/
+│   ├── faac/                    # FAAC, FAAD, FAAM and FAAR source, libraries, CLI tools, and manuals
+│   └── faac-media/              # Demo audio used by the playground
 └── docs/                        # VitePress documentation root
     ├── .vitepress/              # VitePress configuration, theme, and components
-    │   ├── components/          # AudioVisualizer.vue & WasmConverter.vue
+    │   ├── components/          # AudioVisualizer, BenchmarkShowcase, Esp32Showcase, WasmConverter (.vue)
     │   ├── theme/               # Dark theme customizations & custom CSS
     │   └── config.ts            # VitePress navigation, sidebar, and metadata
     ├── blog/                    # Announcement blog posts
-    ├── docs/                    # Technical guides (install.md, faac.md, faad.md, comparison.md)
+    ├── docs/                    # Product pages, generated API references, CLI manuals, install/optimization,
+    │                            #   ESP32 guide, benchmark, comparison and listening guides
+    ├── public/                  # Static assets (logo, og image, WASM worker; WASM binaries are build output)
     ├── index.md                 # Homepage with niche highlights & quick Q&A
     └── playground.md            # Interactive converter playground
 ```
@@ -40,7 +49,7 @@ Official website and technical documentation platform for **FAAC** (LGPL v2.1+ A
 
 ## Recommended Local Development (Docker)
 
-To compile `libfaac` and `libfaad2` C sources into WebAssembly modules using Emscripten and run the full VitePress site locally:
+To compile the FAAC encoder into WebAssembly using Emscripten and run the full VitePress site locally:
 
 ```bash
 # Clone repository with submodules
@@ -51,7 +60,7 @@ cd freewareadvancedaudio.github.io
 docker compose up --build
 ```
 
-Access the development server at `http://localhost:5173` (or `http://localhost:8080`).
+Access the development server at `http://localhost:5173`. The production preview is on port `4173`.
 
 ---
 
@@ -66,7 +75,7 @@ git submodule update --init --recursive
 # Install Node dependencies
 npm install
 
-# Start VitePress local dev server (automatically generates CLI docs from manpages)
+# Start VitePress with live reload (also regenerates references when vendor docs change)
 npm run docs:dev
 
 # Build static production site
@@ -90,6 +99,6 @@ npm run docs:preview
 
 For Docker builds, pass the same values with `--build-arg SITE_BASE_PATH=...` and `--build-arg SITE_ORIGIN=...`. CSS, navigation, favicon, and the converter's worker/module URLs follow the configured base. Changing the host's mount path requires a rebuild.
 
-Website copy describes use cases and evaluation methods without publishing benchmark datasets, release-specific rankings, or performance snapshots. Evaluate codecs with audio you own or have permission to use.
+The [AAC benchmark](docs/docs/aac-benchmark.md) is a dated snapshot generated by the FAAC project's own [benchmark suite](https://github.com/nschimme/faac-benchmark); it lives at `/docs/aac-benchmark`. Re-run and update it when results change. Evaluate codecs with audio you own or have permission to use.
 
-The Docker production build smoke-tests the real WASM worker with generated tones in AAC-LC and HE-AAC v1, checks M4A/gapless output, and verifies error handling. To run that check against existing WASM artifacts: `node scripts/test-wasm-converter.cjs docs/public/wasm`. Pass a native FAAC CLI path as a second argument to also compare decoder configuration, MP4 timing, frame durations, and gapless fields against the frontend. HE-AAC follows the frontend's half-rate container domain, including rounding odd input sample counts.
+The Docker production build smoke-tests the real WASM worker with generated tones in AAC-LC and HE-AAC v1, checks M4A/gapless output, and verifies error handling. To run that check against existing WASM artifacts: `node scripts/test-wasm-converter.cjs docs/public/wasm`. Pass a native FAAC CLI path as a second argument to compare MP4 timing, frame durations, and gapless fields against the frontend. HE-AAC follows the frontend's half-rate container domain, including rounding odd input sample counts.

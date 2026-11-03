@@ -266,6 +266,51 @@
   }
 }
 
+/* Comparison matrices: color-code support markers so tables scan vertically. */
+:root {
+  --audio-cmp-yes: #4ade80;
+  --audio-cmp-partial: #fbbf24;
+  --audio-cmp-no: #64748b;
+}
+
+.vp-doc .cmp-yes {
+  color: var(--audio-cmp-yes);
+  font-weight: 700;
+}
+
+.vp-doc .cmp-partial {
+  color: var(--audio-cmp-partial);
+  font-weight: 700;
+  cursor: help;
+}
+
+.vp-doc .cmp-no {
+  color: var(--audio-cmp-no);
+}
+
+.vp-doc .cmp-legend {
+  margin: 0 0 1.25rem;
+  color: var(--vp-c-text-2);
+  font-size: 0.875rem;
+}
+
+/* Keep the row label visible while a wide matrix scrolls sideways. */
+.comparison-page .vp-doc td:first-child,
+.comparison-page .vp-doc th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background-color: var(--vp-c-bg);
+}
+
+.comparison-page .vp-doc th:first-child {
+  background-color: var(--vp-c-bg-soft);
+}
+
+.comparison-page .vp-doc tr:nth-child(2n) td:first-child {
+  background-color: var(--vp-c-bg-soft);
+}
+
 /* Quiet visual landmarks; icons supplement the visible heading text. */
 :root {
   --audio-icon-cyan: #67e8f9;
@@ -298,6 +343,252 @@
 .feature-icon--violet { color: var(--audio-icon-violet); }
 
 .home-technical-wrapper > h2:first-child { border-top: 0; }
+
+/* AAC on ESP32 story */
+.esp32-showcase { margin: 24px 0; }
+
+.esp32-metric-grid--single { grid-template-columns: minmax(0, 1fr) !important; }
+.esp32-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.esp32-card,
+.esp32-chart-card {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 24px;
+  background: linear-gradient(145deg, var(--vp-c-bg-soft), var(--vp-c-bg));
+  padding: 32px;
+}
+
+.esp32-card-heading {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  color: var(--audio-icon-cyan);
+}
+
+.esp32-card-heading h3 {
+  margin: 0;
+  color: var(--vp-c-text-1);
+  font-size: 15px;
+}
+
+.esp32-card-value {
+  margin-top: 22px;
+  color: var(--audio-icon-cyan);
+  font-size: clamp(42px, 4.5vw, 60px);
+  font-weight: 700;
+  letter-spacing: -1.5px;
+  line-height: 1.15;
+}
+
+.esp32-card-value span {
+  color: var(--vp-c-text-2);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.esp32-card-summary {
+  margin: 8px 0 24px;
+  min-height: 48px;
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.esp32-resource-rows { display: grid; gap: 14px; }
+
+.esp32-resource-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.esp32-resource-label strong {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.esp32-track {
+  margin-top: 5px;
+  height: 8px;
+  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.12);
+  overflow: hidden;
+}
+
+.esp32-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #64748b;
+}
+
+.esp32-fill--encode { background: var(--audio-icon-cyan); }
+.esp32-fill--decode { background: var(--audio-icon-blue); }
+
+.esp32-card-note {
+  margin: 22px 0 0;
+  color: var(--vp-c-text-3);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.esp32-chart-card { margin: 24px 0; }
+.esp32-chart-card figcaption { font-size: 17px; font-weight: 600; }
+
+.esp32-chart-deck {
+  max-width: 60ch;
+  margin: 8px 0 24px;
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+  line-height: 24px;
+}
+
+.esp32-device-list { display: grid; gap: 20px; }
+
+.esp32-device {
+  padding-top: 20px;
+  border-top: 1px solid var(--vp-c-divider);
+}
+
+.esp32-device:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.esp32-device-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.esp32-device-head strong { font-size: 14px; }
+
+.esp32-device-head span {
+  color: var(--vp-c-text-3);
+  font-size: 12px;
+}
+
+.esp32-device-bars { display: grid; gap: 10px; }
+
+.esp32-bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  align-items: center;
+}
+
+.esp32-bar-label {
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+}
+
+.esp32-bar-value {
+  color: var(--vp-c-text-1);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.esp32-bar-track {
+  position: relative;
+  grid-column: 1 / -1;
+  height: 8px;
+  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.esp32-device-bars .esp32-bar-track::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: calc(100% / 13); /* 1× on a 0–13× scale; keep in step with deviceMax in Esp32Showcase.vue */
+  border-left: 1px dashed rgba(203, 213, 225, 0.55);
+}
+
+.esp32-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #64748b;
+}
+
+.esp32-bar-fill--decode { background: var(--audio-icon-blue); }
+.esp32-bar-fill--encode { background: var(--audio-icon-cyan); }
+.esp32-bar-fill--memory { background: var(--audio-icon-violet); }
+
+.esp32-chart-note {
+  margin: 20px 0 0;
+  color: var(--vp-c-text-2);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.esp32-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.esp32-compare-panel {
+  padding: 20px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 16px;
+  background: rgba(148, 163, 184, 0.05);
+}
+
+.esp32-compare-panel.is-highlight {
+  border-color: rgba(103, 232, 249, 0.35);
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.esp32-compare-label {
+  display: block;
+  color: var(--vp-c-text-3);
+  font-size: 12px;
+}
+
+.esp32-compare-panel strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--vp-c-text-1);
+  font-size: 28px;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.esp32-compare-panel.is-highlight strong { color: var(--audio-icon-cyan); }
+
+.esp32-compare-panel span:last-child {
+  display: block;
+  margin-top: 4px;
+  color: var(--vp-c-text-3);
+  font-size: 12px;
+}
+
+.esp32-memory-rows { display: grid; gap: 12px; }
+
+@media (max-width: 640px) {
+  .esp32-metric-grid { grid-template-columns: 1fr; }
+  .esp32-card,
+  .esp32-chart-card { padding: 20px; }
+  .esp32-card-summary { min-height: 0; }
+  .esp32-compare-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 480px) {
+  .esp32-device-head {
+    flex-direction: column;
+    gap: 2px;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .VPFeature { transition: none !important; }

@@ -1,6 +1,6 @@
 ---
-title: FAAC CLI Manual Page
-description: Command-line interface reference for the FAAC AAC audio encoder generated from upstream manpage.
+title: "faac Man Page: AAC Encoder CLI"
+description: "faac command-line reference: every option of the FAAC AAC encoder, including rate control, profiles, raw PCM input and tagging."
 ---
 
 # FAAC Command-Line Manual Page

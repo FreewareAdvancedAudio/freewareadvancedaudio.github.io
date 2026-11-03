@@ -1,17 +1,17 @@
 ---
-title: FAAC Listening Tests — Compare AAC Audio Quality
-description: Test FAAC with your own music. Match AAC profiles and bitrates, run blind listening comparisons, and report reproducible audio quality issues.
+title: "AAC Listening Tests with FAAC"
+description: "Test FAAC with your own music. Match AAC profiles and bitrates, run blind listening comparisons, and report reproducible audio quality issues."
 ---
 
 # FAAC Listening Tests: Compare Audio Quality
 
 Find the **AAC settings that sound right with your music**. Start with a quick browser conversion, then use a controlled listening test when you need a reliable comparison.
 
-Looking for implementation support or speed measurements? Use the [selection guide](/docs/comparison) or [benchmark results](/docs/optimization).
+Looking for implementation support or speed measurements? Use the [selection guide](/docs/comparison) or [benchmark results](/docs/aac-benchmark).
 
 ## Try your own music {data-icon="headphones"}
 
-The [browser converter](/playground) lets you encode a file locally and download an M4A. Start with a lossless source such as WAV or FLAC supported by your browser. Reencoding an MP3 or another lossy file adds a second generation of loss and complicates the comparison.
+The [browser converter](/playground) lets you encode a file locally and download an M4A. Start with a lossless source such as WAV or FLAC supported by your browser. Re-encoding an MP3 or another lossy file adds a second generation of loss and complicates the comparison.
 
 The demo is useful for exploration. For a reproducible comparison, use a local CLI build whose version and settings you can record. The browser demo uses its own compiled encoder and browser audio processing; a local build gives you more control over the test.
 

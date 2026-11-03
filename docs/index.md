@@ -1,5 +1,8 @@
 ---
 layout: home
+title: "FAAC & FAAD: Dependency-Free AAC Encoder and Decoder in C"
+titleTemplate: false
+description: "FAAC is an LGPL AAC encoder, decoder, resampler and MP4 muxer in dependency-free C. Faster than FDK-AAC in published tests, and real time on ESP32. Try it in your browser."
 hero:
   name: "Freeware Advanced Audio"
   text: "Fast, compact AAC encoding and decoding in C"
@@ -19,22 +22,22 @@ hero:
 features:
   - icon: "<i class=\"fa-solid fa-bolt feature-icon feature-icon--cyan\" aria-hidden=\"true\"></i>"
     title: "Fast encoding"
-    details: "Faster aggregate encoding than the compared FDK-AAC, Apple AAC, and FFmpeg AAC builds in published testing."
-    link: "/docs/optimization"
+    details: "Faster aggregate encoding than the compared FDK-AAC, Apple AAC, and FFmpeg AAC builds in published testing, and real time on the ESP32 and ESP32-S3."
+    link: "/docs/aac-benchmark"
     linkText: "Compare encoding speed"
-  - icon: "<i class=\"fa-solid fa-microchip feature-icon feature-icon--blue\" aria-hidden=\"true\"></i>"
-    title: "Small encoder footprint"
-    details: "Lower measured code footprint and peak RAM than the compared encoders. Built for applications with limited resources."
-    link: "/docs/optimization"
-    linkText: "Compare code and memory"
+  - icon: "<i class=\"fa-solid fa-sliders feature-icon feature-icon--blue\" aria-hidden=\"true\"></i>"
+    title: "Build only what you need"
+    details: "Switch off HE-AAC, DAB, DRC, or extra channels at build time. On ESP32 the decoder builds from 29 KB and the encoder from 37 KB of flash."
+    link: "/docs/esp32-aac#trim-the-build"
+    linkText: "See build options"
   - icon: "<i class=\"fa-solid fa-headphones feature-icon feature-icon--violet\" aria-hidden=\"true\"></i>"
     title: "Competitive audio quality"
     details: "Leading aggregate objective quality scores in published testing. Fine-tuned across speech, music, and difficult passages."
-    link: "/docs/optimization"
+    link: "/docs/aac-benchmark"
     linkText: "See quality results"
   - icon: "<i class=\"fa-solid fa-code feature-icon feature-icon--cyan\" aria-hidden=\"true\"></i>"
     title: "Open development"
-    details: "Source code, CLI guides, and C APIs for AAC encoding and decoding. Check the license and release status for the library you plan to use."
+    details: "One C codebase from microcontrollers to desktops, with CLI guides and C APIs. Check the license and release status of the library you plan to use."
     link: "/docs/install"
     linkText: "Choose your library"
 ---
@@ -43,34 +46,48 @@ features:
 
 ## More audio. Less overhead. {data-icon="gauge-high"}
 
-### FAAC: fast encoding in a small footprint
+### Fast encoding and decoding
 
-<BenchmarkShowcase view="resources" />
+<BenchmarkShowcase view="speed" />
 
-### FAAD3: faster decoding, leaner than FAAD2
+FAAC encodes 4.3× faster than FDK-AAC, and FAAD3 decodes 2.4× faster. FAAD3 also ties the top overall MOS.
 
-<BenchmarkShowcase view="decoder" />
+**Benchmark snapshot · October 28, 2026 · MacBook Pro M1, 32 GB.** Encoder and decoder figures come from the same generated leaderboard. Results depend on the tested builds and hardware. See the [benchmark results and tested versions](/docs/aac-benchmark).
 
-FAAD3 targets modern processors with floating-point units and is a development engine. LibHelix uses fixed-point arithmetic, making it an option for legacy hardware without an efficient FPU; it lacks HE-AAC v2 Parametric Stereo support.
+### Build only what you need {data-icon="sliders"}
 
-Measured on a MacBook Pro M1 in the **September 29, 2026 benchmark snapshot**. Results depend on the build and hardware. [See tested versions, quality graphs, memory use, and published evidence](/docs/optimization).
+Every feature is a build option: HE-AAC (SBR), HE-AAC v2 (PS), DAB frames, dynamic range control, and channel count. Switch off what you don't use and the flash cost drops with it. See [Trim the build](/docs/esp32-aac#trim-the-build) for every switch. In the default build, FAAC and FAAD3 together are under a third of the size of FDK-AAC ([whole-library comparison](/docs/aac-benchmark#aac-library-size-faac-and-faad3-vs-fdk-aac)).
+
+<Esp32Showcase view="build" />
+
+## Encoding and decoding AAC in real time on ESP32 {data-icon="microchip"}
+
+The same FAAC and FAAD libraries that lead on powerful machines also run in real time on the ESP32-S3 and the original ESP32. Even the original ESP32, without PSRAM, decodes AAC-LC and HE-AAC v1 in real time.
+
+<Esp32Showcase view="home" />
+
+[Read AAC on ESP32](/docs/esp32-aac) for the encoding, decoding, and hardware details.
 
 ## Hear FAAC with your own music {data-icon="headphones"}
 
-FAAC provides efficient AAC encoding for music collections, media applications, and embedded devices. Try familiar tracks and choose the settings that work for you.
+Try FAAC with familiar tracks and choose the settings that work for you. The browser converter needs no installation or uploads.
 
-[Drop your own music into the converter](/playground), choose a bitrate, and listen to the result. No installation or uploads required. If you want to compare more closely, our [listening guide](/docs/listening) walks through a controlled test. Your feedback helps us understand what works well and what still needs attention.
+[Drop your own music into the converter](/playground), choose a bitrate, and listen. For a closer comparison, the [listening guide](/docs/listening) walks through a controlled test. Your feedback helps us understand what works well and what still needs attention.
 
-See the [AAC benchmark results](/docs/optimization) for measured quality, speed, and footprint. Comparative results depend on the tested builds and hardware; objective scores complement listening.
+For measured quality results, see the [AAC benchmark results](/docs/aac-benchmark). Objective scores complement listening, and results depend on the tested builds and hardware.
 
 ## Choose your starting point {data-icon="compass"}
 
 | What you want to do | Start here |
 | :--- | :--- |
 | Encode music, speech, or streaming audio | [Install FAAC](/docs/install), then try the [CLI and C API](/docs/faac) |
-| Play or decode existing AAC files | [FAAD decoder guide](/docs/faad), including FAAD2 and FAAD3 release distinctions |
+| Play or decode existing AAC files | [FAAD decoder guide](/docs/faad) and [libfaad API reference](/docs/libfaad) |
+| Mux, demux, or tag MP4/M4A files | [FAAM guide](/docs/faam), [libfaam C API](/docs/libfaam), and [faam(1)](/docs/faam-cli) |
+| Convert audio sample rates | [FAAR guide](/docs/faar), [libfaar C API](/docs/libfaar), and [faar(1)](/docs/faar-cli) |
 | Choose an encoder or decoder for your application | [Implementation selection guide](/docs/comparison), including hardware, profiles, and licensing |
-| Compare speed, footprint, and objective quality | [AAC benchmark results](/docs/optimization) |
+| Compare speed, quality, and build size | [AAC benchmark results](/docs/aac-benchmark) |
+| Run AAC encoding or decoding on a microcontroller | [AAC on ESP32](/docs/esp32-aac) |
+| Fit AAC in a flash budget | [Trim the build](/docs/esp32-aac#trim-the-build) |
 | Hear FAAC with your own music | [Browser converter](/playground), with an optional [listening guide](/docs/listening) |
 
 ## Where FAAC and FAAD are used {data-icon="layer-group"}
@@ -80,11 +97,18 @@ From camera firmware to desktop audio tools, these projects integrate FAAC or FA
 | Project | Integration |
 | :--- | :--- |
 | [Thingino](https://github.com/themactep/thingino-firmware/blob/stable/package/faac/faac.mk) | Packages FAAC for open-source firmware for Ingenic IP cameras. |
-| GStreamer | Provides [FAAC encoding](https://gstreamer.freedesktop.org/documentation/faac/index.html) and [FAAD decoding](https://gstreamer.freedesktop.org/documentation/faad/index.html) elements for multimedia pipelines. |
-| [VLC Media Player](https://github.com/videolan/vlc/blob/master/modules/codec/faad.c) | Includes a FAAD2-based AAC decoder module. |
-| [fre:ac](https://github.com/enzo1982/freac/blob/master/Readme) | Integrates FAAC and FAAD2 for AAC conversion in its audio converter and CD ripper. |
+| GStreamer | Provides [FAAC encoding](https://gstreamer.freedesktop.org/documentation/faac/index.html) and [FAAD2 decoding](https://gstreamer.freedesktop.org/documentation/faad/index.html) elements for multimedia pipelines. |
+| [LightNVR](https://lightnvr.com/) | Bundles the [FAAC encoder](https://github.com/opensensor/lightNVR/blob/main/src/video/faac_encoder.c) to transcode camera audio to AAC in its open-source network video recorder. |
+| [VLC Media Player](https://github.com/videolan/vlc/blob/master/modules/codec/faad.c) | Includes a FAAD2 decoder integration. |
+| [fre:ac](https://github.com/enzo1982/freac/blob/master/Readme) | Uses FAAC and FAAD2 for AAC conversion in its audio converter and CD ripper. |
 
-Available libraries and features depend on each project's version and build. Report reproducible library problems in [FAAC issues](https://github.com/FreewareAdvancedAudio/faac/issues) or [FAAD issues](https://github.com/FreewareAdvancedAudio/faad2/issues), including your library version and settings.
+Available libraries and features depend on each project's version and build. Report reproducible library problems in [FAAC and FAAD issues](https://github.com/FreewareAdvancedAudio/faac/issues), including your library version and settings.
+
+## Latest from the blog {data-icon="newspaper"}
+
+<BlogList :limit="3" />
+
+[All posts](/blog/)
 
 ## Quick questions {data-icon="circle-question"}
 
@@ -92,11 +116,13 @@ Available libraries and features depend on each project's version and build. Rep
 
 Use a package manager or build from source. The [installation guide](/docs/install) explains the options and why package versions matter.
 
-### Which library and license do I need?
+### Which software license do FAAC and FAAD use?
 
-FAAC is the encoder; FAAD is the decoder family. FAAC uses LGPL v2.1+, released FAAD2 uses GPL v2+, and next-generation FAAD3 uses LGPL v2.1+. Check the license shipped with your chosen version. Software licensing and codec patent rights are separate questions.
+The FAAC encoder, FAAD3, FAAM and FAAR are LGPL v2.1+. Legacy FAAD2, which many package managers still ship as `faad2`, is GPL v2+. [Which version did I get?](/docs/install#which-version-did-i-get)
 
-The foundational AAC-LC and HE-AAC v1 patents have expired. HE-AAC v2 adds Parametric Stereo patents expiring in 2029. See [patent status by profile](/docs/comparison#patent-status-by-aac-profile) for the distinctions and jurisdiction considerations.
+### Do AAC patents affect my use?
+
+Patent considerations depend on the AAC profile and jurisdiction. See [patent status by profile](/docs/comparison#patent-status-by-aac-profile).
 
 ### How can I help improve quality?
 

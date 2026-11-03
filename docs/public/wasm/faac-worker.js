@@ -47,7 +47,7 @@ self.onmessage = async function(e) {
       }
       self.postMessage({ type: 'progress', progress: 20, status: 'Configuring audio encoder...' });
       const numObjectType = objectType === 'he-v1' ? 5 : (objectType === 'lc' ? 2 : 0);
-      const rateMode = ({ auto: 0, vbr: 1, abr: 2, cbr: 3 })[rateControl] ?? 0;
+      const rateMode = ({ auto: 0, abr: 0, vbr: 1, cbr: 2 })[rateControl] ?? 0;
       const inputFormatCode = isFloat ? 4 : 1; // 4 = FAAC_INPUT_FLOAT, 1 = FAAC_INPUT_16BIT
       session = faac._wasm_converter_open(sampleRate, channels, bitrate * 1000,
                                           numObjectType, rateMode, quantQuality, inputFormatCode, statusPtr);
@@ -55,7 +55,7 @@ self.onmessage = async function(e) {
       if (!session) throw new Error('The encoder could not be initialized.');
       const resolvedObjTypeNum = faac._wasm_converter_object_type(session);
       const resolvedObjectType = resolvedObjTypeNum === 5 ? 'he-v1' : 'lc';
-      const resolvedRateControl = ['auto', 'vbr', 'abr', 'cbr'][faac._wasm_converter_rate_control(session)] || 'auto';
+      const resolvedRateControl = ['abr', 'vbr', 'cbr'][faac._wasm_converter_rate_control(session)] || 'abr';
       const resolvedBitrate = faac._wasm_converter_bit_rate(session);
       const resolvedQuality = faac._wasm_converter_quant_quality(session);
       const frameSamples = faac._wasm_converter_frame_samples(session);

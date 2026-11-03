@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <faac.h>
 #include "mp4write.h"
-#include "input.h"
 
 #define WASM_ERR_MP4 (-7)
 
@@ -22,14 +21,15 @@ typedef struct {
     uint64_t output_samples;
     uint64_t container_position;
     uint32_t rate_divisor;
+    uint32_t rate_control;
     int mp4_open;
     int finished;
     char encoder_name[128];
 } wasm_converter;
 
-/* Match encode_engine.c: HE-AAC MP4 uses the core (half-output) rate.
- * Round scalar metadata in that domain and derive frame durations from the
- * running position so rounding cannot accumulate across frames. */
+/* Match encode_engine.c: HE-AAC codes at half the input rate, so MP4 timing
+ * uses that core rate. Round scalar metadata in that domain and derive frame
+ * durations from the running position so rounding cannot accumulate. */
 static uint64_t container_samples(const wasm_converter *session, uint64_t samples)
 {
     return (samples + session->rate_divisor / 2) / session->rate_divisor;
@@ -64,8 +64,6 @@ wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
                                     int input_format, int32_t *status)
 {
     faac_params params;
-    const uint8_t *asc;
-    uint32_t asc_size;
     if (!status)
         return NULL;
     wasm_converter *session = calloc(1, sizeof(*session));
@@ -77,20 +75,22 @@ wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
     if (*status != FAAC_OK)
         goto fail;
     params.sample_rate = sample_rate;
-    params.num_channels = channels;
-    params.bit_rate = rate_control == FAAC_RC_VBR ? 0 : (channels ? bitrate / channels : 0);
+    params.channels = channels;
+    params.bit_rate = rate_control == FAAC_RC_VBR ? 0 : bitrate;
+    params.quality = rate_control == FAAC_RC_VBR ? quant_quality : 0;
     params.rate_control = (enum faac_rate_control)rate_control;
-    params.quant_quality = rate_control == FAAC_RC_VBR ? quant_quality : 0;
-    params.use_lfe = channels >= 6;
+    session->rate_control = (uint32_t)params.rate_control;
     if (object_type == FAAC_OBJ_HE_AAC_V1) {
         params.object_type = FAAC_OBJ_HE_AAC_V1;
-    } else if (object_type == FAAC_OBJ_LOW) {
-        params.object_type = FAAC_OBJ_LOW;
+    } else if (object_type == FAAC_OBJ_LC) {
+        params.object_type = FAAC_OBJ_LC;
     } else {
         params.object_type = FAAC_OBJ_AUTO;
     }
-    params.output_format = FAAC_STREAM_RAW;
+    params.stream_format = FAAC_STREAM_RAW;
     params.input_format = (input_format == FAAC_INPUT_FLOAT) ? FAAC_INPUT_FLOAT : FAAC_INPUT_16BIT;
+    /* Web Audio speaker order matches the frontend's default WAV order. */
+    params.channel_layout = FAAC_LAYOUT_WAV;
     faac_library_info library = { .struct_size = sizeof(library) };
     *status = faac_get_library_info(&library);
     if (*status != FAAC_OK)
@@ -99,16 +99,7 @@ wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
         *status = FAAC_ERR_INVALID_ARGUMENT;
         goto fail;
     }
-    /* Web Audio speaker order matches the frontend's default WAV order. */
-    int *channel_map = mk_chan_map((uint16_t)channels, 3, 4);
-    if (channels >= 3 && !channel_map) {
-        *status = FAAC_ERR_NO_MEMORY;
-        goto fail;
-    }
-    params.channel_map = channel_map;
-    params.channel_map_count = channel_map ? channels : 0;
     *status = faac_encoder_open(&params, &session->encoder);
-    free(channel_map);
     if (*status != FAAC_OK)
         goto fail;
     session->info.struct_size = sizeof(session->info);
@@ -124,16 +115,13 @@ wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
         *status = FAAC_ERR_NO_MEMORY;
         goto fail;
     }
-    *status = faac_encoder_asc(session->encoder, &asc, &asc_size);
-    if (*status != FAAC_OK)
-        goto fail;
     if (mp4_open("output.m4a", true) != 0) {
         *status = WASM_ERR_MP4;
         goto fail;
     }
     session->mp4_open = 1;
-    mp4_set_format((uint32_t)container_samples(session, session->info.sample_rate), channels, 16);
-    mp4_set_decoder_config(asc, asc_size);
+    mp4_set_format((uint32_t)container_samples(session, params.sample_rate), channels, 16);
+    mp4_set_decoder_config(session->info.asc, session->info.asc_size);
     snprintf(session->encoder_name, sizeof(session->encoder_name), "FAAC %s", wasm_converter_version());
     mp4_set_encoder(session->encoder_name);
     return session;
@@ -154,17 +142,17 @@ uint32_t wasm_converter_frame_samples(const wasm_converter *session)
 
 uint32_t wasm_converter_rate_control(const wasm_converter *session)
 {
-    return session ? session->info.rate_control : FAAC_RC_AUTO;
+    return session ? session->rate_control : FAAC_RC_ABR;
 }
 
 uint32_t wasm_converter_bit_rate(const wasm_converter *session)
 {
-    return session ? session->info.bit_rate * session->channels : 0;
+    return session ? session->info.bit_rate : 0;
 }
 
 uint32_t wasm_converter_quant_quality(const wasm_converter *session)
 {
-    return session ? session->info.quant_quality : 0;
+    return session ? session->info.quality : 0;
 }
 
 void *wasm_converter_input(const wasm_converter *session)

@@ -14,7 +14,7 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 10
 
-  # Maintain Git submodules (vendor/faac and vendor/faad2)
+  # Maintain the FAAC/FAAD source submodule
   - package-ecosystem: "gitsubmodule"
     directory: "/"
     schedule:

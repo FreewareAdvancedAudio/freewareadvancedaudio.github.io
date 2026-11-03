@@ -13,5 +13,4 @@ The interactive browser audio converter component and Web Worker code (`docs/pub
 To view a copy of this license, visit: https://www.gnu.org/licenses/agpl-3.0.html
 
 ## 3. Upstream Submodule Libraries
-- **FAAC (`vendor/faac`)**: Licensed under the **GNU Lesser General Public License v2.1+ (LGPL v2.1+)**.
-- **FAAD2 (`vendor/faad2`)**: Licensed under the **GNU General Public License v2+ (GPL v2+)**.
+- **FAAC (`vendor/faac/libfaac`)** and **FAAD (`vendor/faac/libfaad`)**: Licensed under the **GNU Lesser General Public License v2.1+ (LGPL v2.1+)**.

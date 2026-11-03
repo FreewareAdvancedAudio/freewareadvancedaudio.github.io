@@ -1,128 +1,30 @@
 ---
-title: FAAD AAC Decoder Guide & C API Reference
-description: Complete guide for FAAD (MPEG-4 AAC decoder). Includes CLI examples, multi-channel surround decoding, and libfaad C API documentation.
+title: FAAD AAC Decoder Library Overview
+description: FAAD3 is an LGPL v2.1+ C11 AAC decoder for AAC-LC and HE-AAC. Explore build-dependent HE-AAC v2 support, library and CLI use, and migration from FAAD2.
 ---
 
-# FAAD AAC Decoder Guide & C API Reference
+# FAAD AAC Decoder and C Library
 
-**FAAD (Freeware Advanced Audio Decoder)** is an open-source MPEG-2 and MPEG-4 AAC audio decoder.
+**FAAD (Freeware Advanced Audio Decoder)** is a C11 AAC decoder library and command-line tool. FAAD3, described here, is licensed under **LGPL v2.1 or later**. Use `faad` to convert supported AAC files to PCM audio, or integrate `libfaad` to decode AAC frames inside an application.
 
-The released **FAAD2** engine is licensed under **GPL v2+** (written in C99). The next-generation **FAAD3** engine is written in clean C11 under **LGPL v2.1+**, providing lightweight decoding for embedded systems and cross-platform applications.
-
-See the [decoder performance comparison](/docs/optimization#decoder-performance-faad-vs-helix-and-others) for measured throughput, footprint, and memory use alongside Helix, FDK-AAC, FFmpeg, and Apple.
-
-**Hardware fit:** FAAD3 targets modern processors with floating-point units (FPUs). Fixed-point LibHelix is a better option to evaluate for legacy hardware without an efficient FPU, provided its profile support meets your needs.
-
----
-
-::: info Choose a decoder version
-The installation commands and `NeAACDec*` examples below target released FAAD2. FAAD3 is a separate development engine; consult its selected build for API and profile support. FAAD2 and FAAD3 have different software licenses.
+::: info License depends on the version
+FAAD3 (this library) is **LGPL v2.1+**. Legacy FAAD2, which most package managers ship as `faad2`, is **GPL v2+**, and so is the FAAD2 compatibility shim. This project no longer supports FAAD2. To link from closed-source code, use FAAD3. See [which version did I get](/docs/install#which-version-did-i-get).
 :::
 
-## Technical Highlights {data-icon="sliders"}
+## AAC decoding capabilities
 
-| Feature | Details |
+FAAD supports **AAC-LC**, **HE-AAC v1**, and **HE-AAC v2 Parametric Stereo** when enabled in the build; it does not support xHE-AAC. The library decodes AAC frames supplied by the application and returns PCM, while the command-line tool handles file conversion, including supported container input. See the [supported streams and build requirements](/docs/libfaad#supported-streams) for details.
+
+## Choose how to use FAAD
+
+| If you want to… | Go to… |
 | :--- | :--- |
-| **Licensing** | FAAD2: GPL v2+ (C99) \| FAAD3: LGPL v2.1+ (C11) |
-| **Supported Profiles** | MPEG-4 AAC-LC, HE-AAC v1 (SBR), HE-AAC v2 (PS), Main, LTP |
-| **Surround Sound** | Up to 7.1 channel surround sound with optional 2-channel downmix (`-d`) |
-| **Containers** | Raw ADTS `.aac`, MP4/M4A containers, ADIF streams |
-| **Installation** | See [Installation Guide](/docs/install) |
-| **Full CLI Options** | See [FAAD CLI Manual Page](/docs/faad-cli) |
+| Decode files from a terminal | [FAAD command-line manual](/docs/faad-cli) |
+| Embed AAC decoding in a C application | [libfaad C API reference](/docs/libfaad) |
+| Build FAAD from source | [Installation guide](/docs/install) |
+| Port an application from FAAD2 | [FAAD2 migration notes](/docs/libfaad#porting-from-the-legacy-neaacdec-api) |
+| Compare profiles, implementations, and licenses | [Encoder and decoder comparison](/docs/comparison) |
 
----
+## Evaluate decoder performance and quality
 
-## Quick Start CLI Examples {data-icon="terminal"}
-
-```bash
-# 1. Decode AAC or M4A to uncompressed WAV
-faad -o decoded_output.wav input.m4a
-
-# 2. Inspect bitstream parameters and audio metadata
-faad -i audio_file.aac
-
-# 3. Downmix 5.1 surround sound stream to 2-channel stereo WAV
-faad -d -o stereo_downmix.wav surround_51.m4a
-```
-
-For complete options and flags, view the dedicated [FAAD Command-Line Manual](/docs/faad-cli).
-
----
-
-## C API Reference (`libfaad`) {data-icon="code"}
-
-For the FAAD2 API shown here, link against `-lfaad` and include `<neaacdec.h>`.
-
-### Integration Lifecycle
-
-```c
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <neaacdec.h>
-
-int main(void) {
-    // 1. Allocate decoder handle
-    NeAACDecHandle hDecoder = NeAACDecOpen();
-    if (!hDecoder) return 1;
-
-    // 2. Configure decoder (16-bit PCM output)
-    NeAACDecConfigurationPtr config = NeAACDecGetCurrentConfiguration(hDecoder);
-    config->outputFormat = FAAD_FMT_16BIT;
-    NeAACDecSetConfiguration(hDecoder, config);
-
-    // 3. Initialize decoder with bitstream header
-    unsigned char buffer[2048] = { /* AAC header or first frame bytes */ };
-    unsigned long sampleRate;
-    unsigned char channels;
-
-    if (NeAACDecInit(hDecoder, buffer, sizeof(buffer), &sampleRate, &channels) < 0) {
-        NeAACDecClose(hDecoder);
-        return 1;
-    }
-
-    // 4. Decode frame
-    NeAACDecFrameInfo frameInfo;
-    void *pcmSamples = NeAACDecDecode(hDecoder, &frameInfo, buffer, sizeof(buffer));
-
-    // 5. Cleanup
-    NeAACDecClose(hDecoder);
-    return 0;
-}
-```
-
-### Core API Functions
-
-#### `NeAACDecOpen`
-```c
-NeAACDecHandle NeAACDecOpen(void);
-```
-Initializes a new FAAD decoder instance.
-
-#### `NeAACDecGetCurrentConfiguration` / `NeAACDecSetConfiguration`
-```c
-NeAACDecConfigurationPtr NeAACDecGetCurrentConfiguration(NeAACDecHandle hDecoder);
-unsigned char NeAACDecSetConfiguration(NeAACDecHandle hDecoder, NeAACDecConfigurationPtr config);
-```
-Gets and sets decoder settings (PCM sample format, downmixing).
-
-#### `NeAACDecInit`
-```c
-long NeAACDecInit(NeAACDecHandle hDecoder, unsigned char *buffer,
-                  unsigned long bufferSize, unsigned long *sampleRate,
-                  unsigned char *channels);
-```
-Parses stream header / AudioSpecificConfig bytes to set sample rate and channels.
-
-#### `NeAACDecDecode`
-```c
-void* NeAACDecDecode(NeAACDecHandle hDecoder, NeAACDecFrameInfo *frameInfo,
-                     unsigned char *buffer, unsigned long bufferSize);
-```
-Decodes a single AAC frame into raw PCM audio samples and updates `frameInfo`.
-
-#### `NeAACDecClose`
-```c
-void NeAACDecClose(NeAACDecHandle hDecoder);
-```
-Frees decoder handle memory and resources.
+See the [decoder results](/docs/aac-benchmark#aac-decoder-quality-and-speed) for decoder measurements and their build notes. For ESP32-class decoding, including HE-AAC v2 on the ESP32-S3, see [AAC on ESP32](/docs/esp32-aac). Use the [implementation comparison](/docs/comparison) to compare profiles and licensing.

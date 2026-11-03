@@ -11,5 +11,9 @@ docs/public/wasm/*
 !docs/public/wasm/faac-worker.js
 !docs/public/wasm/README.md
 
+# Demo media copied from the vendor/faac-media submodule at build time
+docs/public/media/*
+
 # Ignore auto-generated CLI docs
 docs/docs/*-cli-gen.md
+docs/docs/*-api-gen.md

@@ -12,3 +12,4 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      - VITEPRESS_POLLING=1

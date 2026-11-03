@@ -1,8 +1,12 @@
+---
+title: "The New FAAC & FAAD Website"
+date: 2026-10-02
+description: "A refreshed home for FAAC and FAAD: documentation, benchmarks, CLI manuals, C API references and a browser-based AAC converter."
+---
+
 # Introducing the New Freeware Advanced Audio Website
 
-*Published: September 2026*
-
-Welcome to the new official website for the **Freeware Advanced Audio** organization!
+Welcome to the new website for **FAAC** and **FAAD**!
 
 We are excited to announce a complete refresh of our online presence, documentation, and web demonstration tools for **FAAC** and **FAAD**.
 
@@ -12,7 +16,7 @@ We are excited to announce a complete refresh of our online presence, documentat
 
 ### 1. Migrated Repositories & Clean Organization
 
-We have officially moved our source repositories from personal accounts (`knik0/faac` and `knik0/faad2`) to the official GitHub organization: <i class="fa-solid fa-arrow-right"></i> **[github.com/FreewareAdvancedAudio](https://github.com/FreewareAdvancedAudio)**
+The FAAC and FAAD source is maintained in the **[Freeware Advanced Audio GitHub organization](https://github.com/FreewareAdvancedAudio)**.
 
 ### 2. The FAAC 2.0+ LGPL Era
 
@@ -43,6 +47,6 @@ If older FAAC releases disappointed you, we welcome your scrutiny of the current
 
 ## Future Roadmap
 
-We are actively working on continuous quality tuning and optimizations for FAAC, as well as the rollout of **FAAD3**—a C11 rewrite under **LGPL v2.1+** bringing LGPL licensing and performance enhancements to the decoder library alongside FAAD2 (GPL v2+, C99).
+We continue to tune FAAC and are preparing **FAAD3**, a C11 rewrite that replaces the earlier FAAD2 decoder, along with the **FAAM** MP4 muxer and **FAAR** resampler. All use **LGPL v2.1+**. Read [the FAAD3 announcement](/blog/faad3-release) and the [FAAD API guide](/docs/libfaad).
 
 Stay tuned for more updates!
