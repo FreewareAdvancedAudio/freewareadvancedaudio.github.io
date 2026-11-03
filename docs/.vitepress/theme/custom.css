@@ -154,6 +154,16 @@
     max-width: 380px !important;
   }
 
+  /* VitePress fixes this box at 320/392px; the visualizer can be taller on wide phones. */
+  .VPHero .image-container {
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  .VPHero .image-bg {
+    display: none;
+  }
+
   .VPHero .main {
     margin-top: 0 !important;
     text-align: left !important;
@@ -593,4 +603,26 @@
 @media (prefers-reduced-motion: reduce) {
   .VPFeature { transition: none !important; }
   .VPFeature:hover { transform: none; }
+}
+
+/* Tablet landscape (e.g. iPad mini): share the row evenly so the visualizer never slides under the text. */
+@media (min-width: 960px) and (max-width: 1279px) {
+  .VPHero .container {
+    gap: 2rem;
+  }
+
+  .VPHero .main {
+    width: auto !important;
+    flex: 1 1 50% !important;
+    min-width: 0;
+  }
+
+  .VPHero .image {
+    flex: 1 1 50% !important;
+    min-width: 0;
+  }
+
+  .VPHero .image-container {
+    transform: none !important;
+  }
 }
