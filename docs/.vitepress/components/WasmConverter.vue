@@ -43,33 +43,45 @@
 
       <!-- Original Audio Player -->
       <div v-if="selectedFile" class="result-card original-audio-card">
-        <div class="result-info">
-          <span class="result-name">{{ selectedFile.name }}</span>
-          <div class="result-meta">
-            <span class="metadata-chip">
-              <span class="metadata-label">Source file</span>
-              {{ formatFileSize(selectedFile.size) }} · {{ selectedFile.name.split('.').pop()?.toUpperCase() || 'Audio' }}
-            </span>
-            <span class="metadata-chip">
-              <span class="metadata-label">Audio</span>
-              <template v-if="decodedAudio">{{ decodedAudio.sampleRate }} Hz · {{ formatChannelLayout(decodedAudio.channels) }} · {{ decodedAudio.bitDepth }}-bit</template>
-              <template v-else>{{ isDecoding ? 'Decoding…' : 'Waiting to decode' }}</template>
-            </span>
-            <span class="metadata-chip">
-              <span class="metadata-label">Duration</span>
-              {{ decodedAudio ? formatDuration(decodedAudio.duration) : '—' }}
-            </span>
+        <div class="result-card-header">
+          <div class="result-info">
+            <span class="result-name">{{ selectedFile.name }}</span>
+            <div class="result-meta">
+              <span class="metadata-chip">
+                <span class="metadata-label">Source file</span>
+                {{ formatFileSize(selectedFile.size) }} · {{ selectedFile.name.split('.').pop()?.toUpperCase() || 'Audio' }}
+              </span>
+              <span class="metadata-chip">
+                <span class="metadata-label">Audio</span>
+                <template v-if="decodedAudio">{{ decodedAudio.sampleRate }} Hz · {{ formatChannelLayout(decodedAudio.channels) }} · {{ decodedAudio.bitDepth }}-bit</template>
+                <template v-else>{{ isDecoding ? 'Decoding audio…' : 'Preparing audio…' }}</template>
+              </span>
+            </div>
           </div>
         </div>
-        <div v-if="originalAudioUrl" class="result-actions">
-          <audio
-            ref="originalPlayer"
-            controls
+
+        <div v-if="originalAudioUrl" class="result-player-fullwidth">
+          <WaveformPlayer
+            ref="originalPlayerRef"
+            track-id="original"
+            aria-label="Original audio"
             :src="originalAudioUrl"
-            class="audio-player"
-            @play="onPlayOriginal"
-            aria-label="Original audio preview"
-          ></audio>
+            :peaks="originalPeaks"
+            :duration="decodedAudio?.duration || 0"
+            :active-track-id="activeTrackId"
+            :shared-time="isReferenceMatch(currentReferenceId) ? sharedPlaybackTime : 0"
+            :playback-start-time="isReferenceMatch(currentReferenceId) ? sharedPlaybackStartTime : null"
+            :loop-region="isReferenceMatch(currentReferenceId) ? sharedLoopRegion : { start: 0, end: null, repeat: false }"
+            :muted="isGlobalMuted"
+            :loading="isDecoding"
+            @play="onTrackPlay($event, currentReferenceId)"
+            @pause="onTrackPause($event, currentReferenceId)"
+            @seek="onTrackSeek($event, currentReferenceId)"
+            @timeupdate="onTrackTimeUpdate($event, currentReferenceId)"
+            @update:playback-start-time="onUpdatePlaybackStartTime($event, currentReferenceId)"
+            @update:loop-region="onUpdateLoopRegion($event, currentReferenceId)"
+            @update:muted="onUpdateGlobalMuted"
+          />
         </div>
       </div>
 
@@ -191,30 +203,66 @@
       <p class="visually-hidden" aria-live="polite" aria-atomic="true">{{ resultAnnouncement }}</p>
       <div class="results-section" v-if="results.length > 0">
         <h4 class="results-title"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> Encoded M4A Output</h4>
-        <div class="result-card" v-for="item in results" :key="item.url">
-          <div class="result-info">
-            <span class="result-name">{{ item.name }}</span>
-            <div class="result-meta">
-              <span v-for="detail in item.details" :key="detail.label" class="metadata-chip">
-                <span class="metadata-label">{{ detail.label }}</span>
-                <span>{{ detail.value }}</span>
-              </span>
+        <div class="result-card" v-for="item in results" :key="item.id">
+          <!-- Card Header: Title & Meta Chips -->
+          <div class="result-card-header">
+            <div class="result-info">
+              <span class="result-name">{{ item.name }}</span>
+              <div class="result-meta">
+                <span v-for="detail in item.details" :key="detail.label" class="metadata-chip">
+                  <span class="metadata-label">{{ detail.label }}</span>
+                  <span>{{ detail.value }}</span>
+                </span>
+              </div>
             </div>
           </div>
 
-          <div class="result-actions">
-            <audio ref="resultPlayers" controls :src="item.url" class="audio-player" @play="onPlayResult($event.target)"></audio>
-            <div class="result-action-buttons">
-              <a :href="item.url" :download="item.name" class="icon-action download-link"
-                :aria-label="`Download ${item.name}`" title="Download output">
-                <i class="fa-solid fa-download" aria-hidden="true"></i>
-              </a>
-              <button ref="discardButtons" type="button" class="icon-action discard-button"
-                :aria-label="`Discard ${item.name}`" title="Discard output"
-                @click="discardResult(item)">
-                <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
-              </button>
-            </div>
+          <!-- Waveform Player spans 100% full width with Download and Discard buttons in the action slot -->
+          <div class="result-player-fullwidth">
+            <WaveformPlayer
+              :track-id="item.id"
+              :aria-label="item.name"
+              :src="item.url"
+              :peaks="item.peaks"
+              :duration="item.duration || decodedAudio?.duration || 0"
+              :active-track-id="activeTrackId"
+              :shared-time="isReferenceMatch(item.referenceId) ? sharedPlaybackTime : 0"
+              :playback-start-time="isReferenceMatch(item.referenceId) ? sharedPlaybackStartTime : null"
+              :loop-region="isReferenceMatch(item.referenceId) ? sharedLoopRegion : { start: 0, end: null, repeat: false }"
+              :muted="isGlobalMuted"
+              :loading="false"
+              @play="onTrackPlay($event, item.referenceId)"
+              @pause="onTrackPause($event, item.referenceId)"
+              @seek="onTrackSeek($event, item.referenceId)"
+              @timeupdate="onTrackTimeUpdate($event, item.referenceId)"
+              @update:playback-start-time="onUpdatePlaybackStartTime($event, item.referenceId)"
+              @update:loop-region="onUpdateLoopRegion($event, item.referenceId)"
+            >
+              <template #actions>
+                <!-- Download Button (matches exact circular player-btn dimensions) -->
+                <a
+                  :href="item.url"
+                  :download="item.name"
+                  class="player-btn download-btn"
+                  :aria-label="`Download ${item.name}`"
+                  title="Download output"
+                >
+                  <i class="fa-solid fa-download" aria-hidden="true"></i>
+                </a>
+
+                <!-- Discard Button (matches exact circular player-btn dimensions) -->
+                <button
+                  ref="discardButtons"
+                  type="button"
+                  class="player-btn discard-btn"
+                  :aria-label="`Discard ${item.name}`"
+                  title="Discard output"
+                  @click="discardResult(item)"
+                >
+                  <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                </button>
+              </template>
+            </WaveformPlayer>
           </div>
         </div>
       </div>
@@ -225,13 +273,31 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { withBase } from 'vitepress'
+import WaveformPlayer from './WaveformPlayer.vue'
+import { computeWaveformPeaksFromPcm, computeWaveformPeaksFromAudioBuffer } from '../utils/waveform.js'
 
 const fileInput = ref(null)
 const selectedFile = ref(null)
 const originalAudioUrl = ref(null)
-const originalPlayer = ref(null)
+const originalPlayerRef = ref(null)
+const originalPeaks = ref([])
+const referenceMaxRms = ref(0.001) // Track reference file's peak RMS for relative normalization
 const decodedAudio = ref(null)
 const isDecoding = ref(false)
+
+// Reference identifier for currently loaded source file
+const currentReferenceId = computed(() => {
+  return selectedFile.value ? `${selectedFile.value.name}-${selectedFile.value.size}` : ''
+})
+
+// Synchronized playback state across all versions of the song
+const activeTrackId = ref('')
+const activeReferenceId = ref('')
+const sharedPlaybackTime = ref(0)
+const sharedPlaybackStartTime = ref(null)
+const sharedLoopRegion = ref({ start: 0, end: null, repeat: false })
+const isGlobalMuted = ref(false)
+
 let decodeRequest = 0
 const isDragOver = ref(false)
 const isDemoLoading = ref(false)
@@ -267,7 +333,6 @@ const isProcessing = ref(false)
 const progress = ref(0)
 const statusMessage = ref('')
 const results = ref([])
-const resultPlayers = ref([])
 const convertButton = ref(null)
 const discardButtons = ref([])
 const resultAnnouncement = ref('')
@@ -288,12 +353,14 @@ function normalizeQuality() {
 async function discardResult(item) {
   const index = results.value.indexOf(item)
   if (index < 0) return
-  resultPlayers.value[index]?.pause()
+  if (activeTrackId.value === item.id) {
+    activeTrackId.value = ''
+  }
   URL.revokeObjectURL(item.url)
   results.value.splice(index, 1)
   resultAnnouncement.value = `Discarded ${item.name}.`
   await nextTick()
-  const nextButton = discardButtons.value[Math.min(index, discardButtons.value.length - 1)]
+  const nextButton = discardButtons.value ? discardButtons.value[Math.min(index, discardButtons.value.length - 1)] : null
   const focusTarget = nextButton || convertButton.value
   focusTarget?.focus()
 }
@@ -326,6 +393,10 @@ function clearResults() {
     if (item?.url) URL.revokeObjectURL(item.url)
   }
   results.value = []
+  activeTrackId.value = ''
+  sharedPlaybackTime.value = 0
+  sharedPlaybackStartTime.value = null
+  sharedLoopRegion.value = { start: 0, end: null, repeat: false }
 }
 
 function handleBeforeUnload(event) {
@@ -363,36 +434,67 @@ async function loadDemo() {
 function selectFile(file) {
   demoRequest++
   isDemoLoading.value = false
+  activeTrackId.value = ''
+  sharedPlaybackTime.value = 0
+  sharedPlaybackStartTime.value = null
+  sharedLoopRegion.value = { start: 0, end: null, repeat: false }
   if (originalAudioUrl.value) {
-    if (originalPlayer.value) originalPlayer.value.pause()
     URL.revokeObjectURL(originalAudioUrl.value)
     originalAudioUrl.value = null
   }
   selectedFile.value = file
   originalAudioUrl.value = null
+  originalPeaks.value = []
+  referenceMaxRms.value = 0.001
   decodedAudio.value = null
   statusMessage.value = ''
   const request = ++decodeRequest
   void decodeSelectedFile(file, request)
 }
 
-function onPlayOriginal() {
-  for (const player of resultPlayers.value) {
-    if (player && !player.paused) {
-      player.pause()
-    }
+function isReferenceMatch(refId) {
+  return !activeReferenceId.value || activeReferenceId.value === refId
+}
+
+// Synchronized playback event handlers
+function onTrackPlay({ trackId }, refId) {
+  if (refId && activeReferenceId.value !== refId) {
+    // Switched to a track from a different reference: reset sync time
+    activeReferenceId.value = refId
+    sharedPlaybackTime.value = 0
+    sharedPlaybackStartTime.value = null
+  }
+  activeTrackId.value = trackId
+}
+
+function onTrackPause({ trackId }, refId) {
+  if (activeTrackId.value === trackId) {
+    activeTrackId.value = ''
   }
 }
 
-function onPlayResult(targetAudio) {
-  if (originalPlayer.value && !originalPlayer.value.paused) {
-    originalPlayer.value.pause()
-  }
-  for (const player of resultPlayers.value) {
-    if (player && player !== targetAudio && !player.paused) {
-      player.pause()
-    }
-  }
+function onTrackSeek(time, refId) {
+  if (refId) activeReferenceId.value = refId
+  sharedPlaybackTime.value = time
+}
+
+function onTrackTimeUpdate(time, refId) {
+  if (refId && activeReferenceId.value !== refId) return
+  sharedPlaybackTime.value = time
+}
+
+function onUpdatePlaybackStartTime(time, refId) {
+  if (refId) activeReferenceId.value = refId
+  sharedPlaybackStartTime.value = time
+}
+
+function onUpdateLoopRegion(region, refId) {
+  if (refId) activeReferenceId.value = refId
+  sharedLoopRegion.value = region
+}
+
+function onUpdateGlobalMuted(muted) {
+  isGlobalMuted.value = muted
 }
 
 onUnmounted(() => {
@@ -497,6 +599,21 @@ function audioBufferToFloat32(audioBuffer) {
   return pcmFloat
 }
 
+// Decode an encoded M4A and compute its waveform peaks relative to the reference track
+async function extractWaveformFromM4a(buffer, refMaxRms = 0.001, sliceCount = 360) {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext
+  if (!AudioContextClass) return []
+  const tempCtx = new AudioContextClass()
+  try {
+    const audioBuffer = await tempCtx.decodeAudioData(buffer.slice(0))
+    return computeWaveformPeaksFromAudioBuffer(audioBuffer, refMaxRms, sliceCount)
+  } catch {
+    return []
+  } finally {
+    try { await tempCtx.close() } catch {}
+  }
+}
+
 function createPreviewWav(pcmData, sampleRate, channels, sampleFormat) {
   // PCM WAV is broadly playable in native browser audio controls, even when
   // the browser can decode the chosen source format but cannot play it.
@@ -532,14 +649,18 @@ async function decodeSelectedFile(file, request) {
     return
   }
   isDecoding.value = true
-  progress.value = 0
-  statusMessage.value = 'Decoding audio for reuse…'
-  const nextPaint = () => new Promise((resolve) => setTimeout(resolve, 0))
+  progress.value = 5
+  statusMessage.value = 'Reading audio file...'
+  const nextPaint = () => new Promise((resolve) => setTimeout(resolve, 30))
   let audioCtx
   let trickle
   try {
     const fileBuffer = await file.arrayBuffer()
-    progress.value = 10
+    if (request !== decodeRequest) return
+    progress.value = 25
+    statusMessage.value = 'Decoding audio stream...'
+    await nextPaint()
+
     // decodeAudioData detaches fileBuffer, so keep a copy of M4A sources for tag carry-over.
     const fileBytes = new Uint8Array(fileBuffer)
     const isM4aSource = fileBytes.length > 12 && String.fromCharCode(...fileBytes.subarray(4, 8)) === 'ftyp'
@@ -556,15 +677,19 @@ async function decodeSelectedFile(file, request) {
       audioCtx = new AudioContextClass()
     }
 
-    progress.value = 20
-    // decodeAudioData reports no progress; creep toward 70% while it runs.
+    // Steady, smooth progression while decodeAudioData runs asynchronously
     trickle = setInterval(() => {
-      if (request === decodeRequest && progress.value < 70) progress.value += Math.max(1, Math.round((70 - progress.value) / 10))
-    }, 150)
+      if (request === decodeRequest && progress.value < 75) {
+        progress.value += Math.max(1, Math.round((75 - progress.value) / 6))
+      }
+    }, 120)
+
     const decodedBuffer = await audioCtx.decodeAudioData(fileBuffer)
     clearInterval(trickle)
     if (request !== decodeRequest) return
-    progress.value = 75
+
+    progress.value = 80
+    statusMessage.value = 'Processing PCM audio...'
     await nextPaint()
 
     const isHighPrecision = parsedBitDepth && parsedBitDepth > 16
@@ -572,8 +697,15 @@ async function decodeSelectedFile(file, request) {
     const pcmData = isHighPrecision
       ? audioBufferToFloat32(decodedBuffer)
       : audioBufferToPcm16(decodedBuffer)
+
     progress.value = 90
+    statusMessage.value = 'Generating audio waveform...'
     await nextPaint()
+
+    // Extract high-resolution waveform peaks
+    const { peaks, maxRms } = computeWaveformPeaksFromPcm(pcmData, decodedBuffer.numberOfChannels, sampleFormat, 360)
+    originalPeaks.value = peaks
+    referenceMaxRms.value = maxRms
 
     decodedAudio.value = {
       pcmData,
@@ -586,14 +718,16 @@ async function decodeSelectedFile(file, request) {
     }
     if (originalAudioUrl.value) URL.revokeObjectURL(originalAudioUrl.value)
     originalAudioUrl.value = createPreviewWav(pcmData, decodedBuffer.sampleRate, decodedBuffer.numberOfChannels, sampleFormat)
+
+    progress.value = 100
     statusMessage.value = 'Audio decoded and ready to encode.'
+    await nextPaint()
   } catch (err) {
     if (request === decodeRequest) statusMessage.value = 'Could not decode this audio: ' + err.message
   } finally {
     clearInterval(trickle)
     if (request === decodeRequest) {
       isDecoding.value = false
-      if (!isProcessing.value) progress.value = 0
     }
     if (audioCtx?.close) {
       try { await audioCtx.close() } catch {}
@@ -604,8 +738,7 @@ async function decodeSelectedFile(file, request) {
 async function startEncoding() {
   if (!selectedFile.value || !decodedAudio.value || isDecoding.value) return
 
-  if (originalPlayer.value) originalPlayer.value.pause()
-  for (const player of resultPlayers.value) player?.pause()
+  activeTrackId.value = ''
 
   isProcessing.value = true
   progress.value = 0
@@ -649,14 +782,29 @@ async function startEncoding() {
             label: 'Encoding',
             value: `${profileName} · ${modeLabel} · ${msg.resolvedRateControl === 'vbr' ? `Quality ${msg.resolvedQuality}` : `Target ${Math.round(msg.resolvedBitrate / 1000)} kbps`}`,
           },
-          { label: 'Input', value: `${sampleRate} Hz · ${bitDepth ? bitDepth + '-bit · ' : ''}${formatChannelLayout(channels)} · ${formatDuration(duration)}` },
+          { label: 'Input', value: `${sampleRate} Hz · ${bitDepth ? bitDepth + '-bit · ' : ''}${formatChannelLayout(channels)}` },
           { label: 'Output', value: `${formatFileSize(outputBuffer.byteLength)} · ~${Math.round(averageKbps)} kbps${msg.resolvedSampleRate && msg.resolvedSampleRate !== sampleRate ? ` · resampled to ${msg.resolvedSampleRate} Hz` : ''}` },
         ]
-        results.value.unshift({
+
+        const resultItem = {
+          id: `encoded-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           name: outName,
+          referenceId: selectedFile.value ? `${selectedFile.value.name}-${selectedFile.value.size}` : 'default',
           details,
           url: url,
+          peaks: originalPeaks.value ? [...originalPeaks.value] : [],
+          duration: duration,
+          isWaveformLoading: false,
           rawBuffer: outputBuffer
+        }
+        results.value.unshift(resultItem)
+
+        // Compute actual waveform of the encoded M4A output with shared normalization against reference
+        void extractWaveformFromM4a(outputBuffer.buffer, referenceMaxRms.value, 360).then(encodedPeaks => {
+          if (encodedPeaks && encodedPeaks.length > 0) {
+            // Only update if difference from original peaks is meaningful, avoiding visual pop
+            resultItem.peaks = encodedPeaks
+          }
         })
 
         worker.terminate()
@@ -1098,31 +1246,51 @@ async function startEncoding() {
 .result-card {
   background: #0f172a;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 0.85rem 1rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
   display: flex;
   flex-direction: column;
-  gap: 0.8rem;
+  gap: 0.75rem;
+}
+
+.result-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+@media (min-width: 640px) {
+  .result-card-header {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+}
+
+.result-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .result-name {
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   color: #f8fafc;
   display: block;
 }
 
 .result-meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.6rem;
+  margin-top: 0.5rem;
 }
 
 .metadata-chip {
   min-width: 0;
-  padding: 0.55rem 0.65rem;
+  padding: 0.45rem 0.65rem;
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 8px;
   color: #e2e8f0;
@@ -1141,6 +1309,62 @@ async function startEncoding() {
   text-transform: uppercase;
 }
 
+/* Waveform Player Action Buttons (Download & Discard) */
+.player-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.player-btn:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+}
+
+.download-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 0.88rem;
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.12);
+  border-color: rgba(16, 185, 129, 0.35);
+  text-decoration: none;
+}
+
+.download-btn:hover,
+.download-btn:focus-visible {
+  background: #10b981;
+  color: #0f172a;
+  border-color: #10b981;
+}
+
+.discard-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 0.85rem;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.discard-btn:hover,
+.discard-btn:focus-visible {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+
+.result-player-fullwidth {
+  width: 100%;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -1151,27 +1375,6 @@ async function startEncoding() {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
-}
-
-.result-actions {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  gap: 0.5rem;
-}
-
-@media (min-width: 640px) {
-  .result-actions {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-  }
-}
-
-.audio-player {
-  height: 54px;
-  width: 100%;
 }
 
 @media (max-width: 420px) {
@@ -1190,61 +1393,12 @@ async function startEncoding() {
   .preset-btn {
     flex: 1 0 3rem;
   }
-}
 
-@media (min-width: 640px) {
-  .audio-player {
-    flex: 1;
+  .player-btn.download-btn,
+  .player-btn.discard-btn {
+    width: 2rem;
+    height: 2rem;
+    font-size: 0.8rem;
   }
-}
-
-.result-action-buttons {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem;
-}
-
-.icon-action {
-  display: inline-flex;
-  width: 2.75rem;
-  height: 2.75rem;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  font-size: 1rem;
-  cursor: pointer;
-  touch-action: manipulation;
-}
-
-.download-link {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  text-decoration: none;
-}
-
-.download-link:hover,
-.download-link:focus-visible {
-  background: #10b981;
-  color: #0f172a;
-}
-
-.discard-button {
-  background: rgba(248, 113, 113, 0.1);
-  color: #fca5a5;
-  border: 1px solid rgba(248, 113, 113, 0.3);
-}
-
-.discard-button:hover,
-.discard-button:focus-visible {
-  background: #ef4444;
-  color: #fff;
-}
-
-.icon-action:focus-visible {
-  outline: 2px solid #e2e8f0;
-  outline-offset: 2px;
 }
 </style>

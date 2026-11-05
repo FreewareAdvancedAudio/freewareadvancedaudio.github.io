@@ -7,10 +7,12 @@
     "docs:generate-cli": "node scripts/generate-cli-docs.js",
     "docs:dev": "node scripts/dev-docs.js",
     "docs:build": "npm run docs:generate-cli && vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "test": "vitest run"
   },
   "devDependencies": {
     "vitepress": "^1.5.0",
+    "vitest": "^5.1.0",
     "vue": "^3.5.44"
   }
 }

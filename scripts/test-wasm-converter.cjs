@@ -89,6 +89,7 @@ async function main() {
   };
   const context = vm.createContext({
     self, URL, Int16Array, Float32Array,
+    setTimeout, clearTimeout,
     importScripts(url) {
       imported = url;
       self.FAACModule = () => {

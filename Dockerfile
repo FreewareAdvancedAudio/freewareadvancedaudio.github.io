@@ -49,7 +49,7 @@ RUN mkdir -p /build/out_wasm && \
       -o /build/out_wasm/faac.js
 
 # Development stage
-FROM node:20-slim AS app
+FROM node:24-slim AS app
 
 WORKDIR /app
 
@@ -83,4 +83,4 @@ ARG SITE_BASE_PATH=/
 ARG SITE_ORIGIN=https://freewareadvancedaudio.github.io
 ENV SITE_BASE_PATH=$SITE_BASE_PATH SITE_ORIGIN=$SITE_ORIGIN
 
-RUN node scripts/test-wasm-converter.cjs docs/public/wasm && npm run docs:build
+RUN node scripts/test-wasm-converter.cjs docs/public/wasm && npm test && npm run docs:build
