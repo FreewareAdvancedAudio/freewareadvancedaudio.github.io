@@ -54,17 +54,11 @@
     >
       <!-- Background Waveform SVG Bars -->
       <svg
-        class="waveform-svg"
+        class="waveform-svg waveform-svg-unplayed"
         viewBox="0 0 1000 100"
         preserveAspectRatio="none"
         aria-hidden="true"
       >
-        <defs>
-          <clipPath :id="clipId">
-            <rect :x="0" :y="0" :width="progressPercent * 10" height="100" />
-          </clipPath>
-        </defs>
-
         <!-- Dimmed unplayed bars -->
         <g class="waveform-bars-unplayed">
           <rect
@@ -77,20 +71,34 @@
             rx="1.0"
           />
         </g>
-
-        <!-- Colored played bars clipped to progress -->
-        <g class="waveform-bars-played" :clip-path="`url(#${clipId})`">
-          <rect
-            v-for="(bar, i) in normalizedBars"
-            :key="'played-' + i"
-            :x="bar.x"
-            :y="bar.y"
-            :width="bar.width"
-            :height="bar.height"
-            rx="1.0"
-          />
-        </g>
       </svg>
+
+      <!-- Colored played bars container clipped via CSS overflow and hardware-accelerated transition -->
+      <div
+        class="waveform-played-container"
+        :class="{ 'is-transitioning': isTransitioning }"
+        :style="playedProgressStyle"
+        aria-hidden="true"
+      >
+        <svg
+          class="waveform-svg waveform-svg-played"
+          viewBox="0 0 1000 100"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <g class="waveform-bars-played">
+            <rect
+              v-for="(bar, i) in normalizedBars"
+              :key="'played-' + i"
+              :x="bar.x"
+              :y="bar.y"
+              :width="bar.width"
+              :height="bar.height"
+              rx="1.0"
+            />
+          </g>
+        </svg>
+      </div>
 
       <!-- Shaded Dim Overlay for outside loop region (iOS trimmer style) -->
       <div
@@ -168,8 +176,8 @@
       <!-- Scrub Playhead Line -->
       <div
         class="waveform-playhead"
-        :class="{ 'is-animating': isPlaying }"
-        :style="{ left: `${progressPercent}%` }"
+        :class="{ 'is-transitioning': isTransitioning }"
+        :style="playheadProgressStyle"
         aria-hidden="true"
       ></div>
 
@@ -184,9 +192,9 @@
 
     <!-- Duration / Timestamp -->
     <div class="player-time" aria-hidden="true">
-      <span class="current-time">{{ formatDuration(currentTime) }}</span>
+      <span class="current-time">{{ formatDuration(displayTime) }}</span>
       <span class="time-sep">/</span>
-      <span class="total-duration">{{ formatDuration(totalDuration) }}</span>
+      <span class="total-duration">{{ formatDuration(displayDuration) }}</span>
     </div>
 
     <!-- Trailing Action Controls: customizable via slot or default Repeat/Mute -->
@@ -255,7 +263,7 @@ const trackRef = ref(null)
 const isPlaying = ref(false)
 const localMuted = ref(false)
 const localDuration = ref(0)
-const localPlayTime = ref(0) // High-frequency continuous play time during playback
+const localPlayTime = ref(0)
 const isDraggingTrack = ref(false)
 const isSeekingInternal = ref(false)
 const isHovering = ref(false)
@@ -263,10 +271,11 @@ const hoverPercent = ref(null)
 const activeDragHandle = ref(null) // 'start' | 'end' | null
 const trackPixelWidth = ref(600)
 let resizeObserver = null
-let animationFrameId = null
-let lastEmittedSec = -1
+let transitionRafId = null
 
-const clipId = `waveform-clip-${Math.random().toString(36).slice(2, 9)}`
+const isTransitioning = ref(false)
+const targetProgressPercent = ref(0)
+const transitionDurationSec = ref(0)
 
 const totalDuration = computed(() => {
   return props.duration || localDuration.value || 0
@@ -277,17 +286,45 @@ const isSelfActive = computed(() => {
 })
 
 const currentTime = computed(() => {
-  if (isSelfActive.value && isPlaying.value) {
+  if (isSelfActive.value) {
     return localPlayTime.value
   }
   return props.sharedTime || 0
 })
 
-const progressPercent = computed(() => {
+const currentProgressPercent = computed(() => {
   if (!totalDuration.value || totalDuration.value <= 0) return 0
-  const time = isSelfActive.value && isPlaying.value ? localPlayTime.value : (props.sharedTime || 0)
+  const time = isSelfActive.value ? localPlayTime.value : (props.sharedTime || 0)
   const pct = (time / totalDuration.value) * 100
   return Math.min(100, Math.max(0, pct))
+})
+
+const playedProgressStyle = computed(() => {
+  const widthPct = isTransitioning.value ? targetProgressPercent.value : currentProgressPercent.value
+  if (isTransitioning.value && transitionDurationSec.value > 0) {
+    return {
+      width: `${widthPct}%`,
+      transition: `width ${transitionDurationSec.value}s linear`,
+    }
+  }
+  return {
+    width: `${widthPct}%`,
+    transition: 'none',
+  }
+})
+
+const playheadProgressStyle = computed(() => {
+  const leftPct = isTransitioning.value ? targetProgressPercent.value : currentProgressPercent.value
+  if (isTransitioning.value && transitionDurationSec.value > 0) {
+    return {
+      left: `${leftPct}%`,
+      transition: `left ${transitionDurationSec.value}s linear`,
+    }
+  }
+  return {
+    left: `${leftPct}%`,
+    transition: 'none',
+  }
 })
 
 // Loop window bounds
@@ -310,6 +347,16 @@ const isTrimmed = computed(() => {
   const trimmedLeft = loopStart.value > 0.05
   const trimmedRight = loopEnd.value < totalDuration.value - 0.05
   return trimmedLeft || trimmedRight
+})
+
+// With a trim region active, show position and length relative to that region
+const displayDuration = computed(() => {
+  return isTrimmed.value ? Math.max(0, loopEnd.value - loopStart.value) : totalDuration.value
+})
+
+const displayTime = computed(() => {
+  if (!isTrimmed.value) return currentTime.value
+  return Math.max(0, Math.min(displayDuration.value, currentTime.value - loopStart.value))
 })
 
 const effectiveMuted = computed(() => {
@@ -394,71 +441,47 @@ function handleLoadedMetadata() {
   }
 }
 
-function startPlaybackLoop() {
-  stopPlaybackLoop()
-  // If tab is in background, do not start RAF loop to save battery
-  if (typeof document !== 'undefined' && document.hidden) return
+function startCssPlaybackTransition() {
+  stopCssPlaybackTransition()
+  if (!audioEl.value || !totalDuration.value) return
+  const curTime = audioEl.value.currentTime
+  localPlayTime.value = curTime
 
-  const tick = () => {
-    if (!audioEl.value || !isPlaying.value || !isSelfActive.value) {
-      stopPlaybackLoop()
-      return
-    }
-
-    const curTime = audioEl.value.currentTime
-    localPlayTime.value = curTime
-
-    // Check loop / trimmed end wrap-around smoothly
-    if (isTrimmed.value && curTime >= loopEnd.value) {
-      if (isRepeatEnabled.value) {
-        audioEl.value.currentTime = loopStart.value
-        localPlayTime.value = loopStart.value
-        emit('timeupdate', loopStart.value)
-        emit('seek', loopStart.value)
-        animationFrameId = requestAnimationFrame(tick)
-        return
-      } else {
-        // Repeat is OFF: stop cleanly at the end handle
-        audioEl.value.pause()
-        audioEl.value.currentTime = loopStart.value
-        localPlayTime.value = loopStart.value
-        emit('timeupdate', loopStart.value)
-        emit('seek', loopStart.value)
-        emit('pause', { trackId: props.trackId })
-        stopPlaybackLoop()
-        return
-      }
-    }
-
-    // Emit timeupdate throttled to roughly 4-5 times/sec or when integer second changes
-    // This keeps parent shared state in sync without flooding reactive trees every frame
-    const curSec = Math.floor(curTime)
-    if (curSec !== lastEmittedSec) {
-      lastEmittedSec = curSec
-      emit('timeupdate', curTime)
-    }
-
-    animationFrameId = requestAnimationFrame(tick)
+  const targetTime = isTrimmed.value ? loopEnd.value : totalDuration.value
+  const remaining = Math.max(0, targetTime - curTime)
+  if (remaining <= 0) {
+    return
   }
 
-  animationFrameId = requestAnimationFrame(tick)
+  const startPercent = Math.min(100, Math.max(0, (curTime / totalDuration.value) * 100))
+  const endPercent = Math.min(100, Math.max(0, (targetTime / totalDuration.value) * 100))
+
+  isTransitioning.value = false
+  targetProgressPercent.value = startPercent
+  transitionDurationSec.value = 0
+
+  // Use double requestAnimationFrame to ensure the DOM applies transition: none
+  // at the start position before initiating the CSS linear transition.
+  transitionRafId = requestAnimationFrame(() => {
+    transitionRafId = requestAnimationFrame(() => {
+      transitionRafId = null
+      if (!isPlaying.value) return
+      isTransitioning.value = true
+      targetProgressPercent.value = endPercent
+      transitionDurationSec.value = remaining
+    })
+  })
 }
 
-function stopPlaybackLoop() {
-  if (animationFrameId !== null) {
-    cancelAnimationFrame(animationFrameId)
-    animationFrameId = null
+function stopCssPlaybackTransition() {
+  if (transitionRafId !== null) {
+    cancelAnimationFrame(transitionRafId)
+    transitionRafId = null
   }
-}
-
-function handleVisibilityChange() {
-  if (typeof document === 'undefined') return
-  if (document.hidden) {
-    // Pause RAF when backgrounded to prevent battery drain
-    stopPlaybackLoop()
-  } else if (isPlaying.value && isSelfActive.value) {
-    // Resume RAF when returning to foreground
-    startPlaybackLoop()
+  isTransitioning.value = false
+  transitionDurationSec.value = 0
+  if (audioEl.value) {
+    localPlayTime.value = audioEl.value.currentTime
   }
 }
 
@@ -468,12 +491,12 @@ function handleNativePlay() {
     localPlayTime.value = audioEl.value.currentTime
   }
   emit('play', { trackId: props.trackId })
-  startPlaybackLoop()
+  startCssPlaybackTransition()
 }
 
 function handleNativePause() {
   isPlaying.value = false
-  stopPlaybackLoop()
+  stopCssPlaybackTransition()
   if (audioEl.value) {
     localPlayTime.value = audioEl.value.currentTime
     emit('timeupdate', audioEl.value.currentTime)
@@ -483,10 +506,10 @@ function handleNativePause() {
 
 function handleTimeUpdate() {
   if (!audioEl.value || isDraggingTrack.value || isSeekingInternal.value) return
-  if (isSelfActive.value) {
-    const curTime = audioEl.value.currentTime
-    localPlayTime.value = curTime
+  const curTime = audioEl.value.currentTime
+  localPlayTime.value = curTime
 
+  if (isSelfActive.value) {
     // Check loop / trimmed end wrap-around
     if (isTrimmed.value && curTime >= loopEnd.value) {
       if (isRepeatEnabled.value) {
@@ -494,6 +517,7 @@ function handleTimeUpdate() {
         localPlayTime.value = loopStart.value
         emit('timeupdate', loopStart.value)
         emit('seek', loopStart.value)
+        startCssPlaybackTransition()
         return
       } else {
         // Repeat is OFF: stop cleanly at the end handle
@@ -503,10 +527,10 @@ function handleTimeUpdate() {
         emit('timeupdate', loopStart.value)
         emit('seek', loopStart.value)
         emit('pause', { trackId: props.trackId })
+        stopCssPlaybackTransition()
         return
       }
     }
-
     emit('timeupdate', curTime)
   }
 }
@@ -597,14 +621,19 @@ function handleTrackPointerDown(event) {
 // clicking just moves the position.
 function seekAndPlay(seekTime) {
   const keepPlaying = isPlaying.value || props.activeTrackId !== ''
+  stopCssPlaybackTransition()
 
+  localPlayTime.value = seekTime
   emit('update:playbackStartTime', seekTime)
   emit('seek', seekTime)
   if (keepPlaying) emit('play', { trackId: props.trackId })
 
   if (audioEl.value) {
     audioEl.value.currentTime = seekTime
-    if (keepPlaying) audioEl.value.play().catch(() => {})
+    if (keepPlaying) {
+      audioEl.value.play().catch(() => {})
+      startCssPlaybackTransition()
+    }
   }
 }
 
@@ -616,6 +645,8 @@ function handleTrackPointerMove(event) {
 
   if (isDraggingTrack.value) {
     const seekTime = ratio * totalDuration.value
+    stopCssPlaybackTransition()
+    localPlayTime.value = seekTime
     emit('seek', seekTime)
     if (audioEl.value && Math.abs(audioEl.value.currentTime - seekTime) > 0.1) {
       audioEl.value.currentTime = seekTime
@@ -629,6 +660,9 @@ function handleTrackPointerUp(event) {
       trackRef.value?.releasePointerCapture?.(event.pointerId)
     } catch {}
     isDraggingTrack.value = false
+    if (isPlaying.value && isSelfActive.value) {
+      startCssPlaybackTransition()
+    }
   }
 }
 
@@ -722,15 +756,11 @@ watch(effectiveMuted, (newVal) => {
 // Watch sharedTime from parent: sync audio element when not actively updating itself
 watch(() => props.sharedTime, (newTime) => {
   if (!audioEl.value) return
-  if (!isSelfActive.value) {
-    // Other inactive tracks mirror the shared playback position
+  if (!isSelfActive.value || isDraggingTrack.value) {
     localPlayTime.value = newTime
     if (Math.abs(audioEl.value.currentTime - newTime) > 0.05) {
       audioEl.value.currentTime = newTime
     }
-  } else if (isDraggingTrack.value) {
-    localPlayTime.value = newTime
-    audioEl.value.currentTime = newTime
   }
 })
 
@@ -758,19 +788,13 @@ onMounted(() => {
     })
     resizeObserver.observe(trackRef.value)
   }
-  if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-  }
 })
 
 onUnmounted(() => {
-  stopPlaybackLoop()
+  stopCssPlaybackTransition()
   if (resizeObserver) {
     resizeObserver.disconnect()
     resizeObserver = null
-  }
-  if (typeof document !== 'undefined') {
-    document.removeEventListener('visibilitychange', handleVisibilityChange)
   }
 })
 
@@ -917,6 +941,25 @@ defineExpose({
   display: block;
 }
 
+.waveform-played-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.waveform-svg-played {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  /* Match the full width of the parent track so clipping shows exactly the played portion */
+  width: calc(v-bind('trackPixelWidth') * 1px);
+}
+
 .player-actions {
   display: flex;
   align-items: center;
@@ -1044,12 +1087,6 @@ defineExpose({
   pointer-events: none;
   transform: translateX(-50%);
   z-index: 4;
-  transition: left 0.1s ease-out;
-}
-
-/* While actively playing, remove CSS transition to prevent fighting 60fps RAF updates */
-.waveform-playhead.is-animating {
-  transition: none;
 }
 
 /* Hover Guide Line */

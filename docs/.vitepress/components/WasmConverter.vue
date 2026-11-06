@@ -274,7 +274,9 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { withBase } from 'vitepress'
 import WaveformPlayer from './WaveformPlayer.vue'
+import AudioProcessorWorker from '../utils/audio-processor.worker.js?worker'
 import { computeWaveformPeaksFromPcm, computeWaveformPeaksFromAudioBuffer } from '../utils/waveform.js'
+import { createSmoothProgress } from '../utils/progress.js'
 
 const fileInput = ref(null)
 const selectedFile = ref(null)
@@ -332,11 +334,65 @@ const customRates = computed(() => {
 const isProcessing = ref(false)
 const progress = ref(0)
 const statusMessage = ref('')
+const smoothProgress = createSmoothProgress((val) => {
+  progress.value = val
+})
 const results = ref([])
 const convertButton = ref(null)
 const discardButtons = ref([])
 const resultAnnouncement = ref('')
 let activeWorker = null
+let audioProcessorWorker = null
+let nextWorkerTaskId = 1
+const pendingWorkerTasks = new Map()
+
+function getAudioProcessorWorker() {
+  if (!audioProcessorWorker && typeof window !== 'undefined') {
+    audioProcessorWorker = new AudioProcessorWorker()
+    audioProcessorWorker.onmessage = (e) => {
+      const { id, type, progress: taskProgress, status: taskStatus, success, error, ...payload } = e.data
+      const task = pendingWorkerTasks.get(id)
+      if (task) {
+        if (type === 'progress') {
+          task.onProgress?.({ progress: taskProgress, status: taskStatus })
+          return
+        }
+        pendingWorkerTasks.delete(id)
+        if (success) {
+          task.resolve(payload)
+        } else {
+          task.reject(new Error(error || 'Audio processing worker failed'))
+        }
+      }
+    }
+    audioProcessorWorker.onerror = (err) => {
+      console.error('Audio processor worker error:', err)
+      for (const task of pendingWorkerTasks.values()) {
+        task.reject(new Error('Audio processor worker crashed'))
+      }
+      pendingWorkerTasks.clear()
+    }
+  }
+  return audioProcessorWorker
+}
+
+function runAudioProcessorTask(type, payload, transfer = [], onProgress = null) {
+  return new Promise((resolve, reject) => {
+    try {
+      const worker = getAudioProcessorWorker()
+      if (!worker) {
+        reject(new Error('Web Workers are not supported in this environment'))
+        return
+      }
+      const id = ++nextWorkerTaskId
+      pendingWorkerTasks.set(id, { resolve, reject, onProgress })
+      worker.postMessage({ id, type, payload }, transfer)
+    } catch (err) {
+      reject(err)
+    }
+  })
+}
+
 const maxQuantQuality = computed(() => objectType.value === 'he-v1' ? 75 : 5000)
 const qualityPresets = computed(() => [20, 30, 40, 50, 60, 75, 100, 150, 200, 300, 500, 800].filter(value => value <= maxQuantQuality.value))
 
@@ -420,7 +476,24 @@ async function loadDemo() {
   try {
     const response = await fetch(withBase('/media/pipeline-tighter.m4a'))
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    const blob = await response.blob()
+
+    const contentLength = Number(response.headers.get('Content-Length')) || 0
+    let blob
+    if (response.body && contentLength > 0) {
+      const reader = response.body.getReader()
+      const chunks = []
+      let receivedBytes = 0
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        chunks.push(value)
+        receivedBytes += value.length
+      }
+      blob = new Blob(chunks, { type: 'audio/mp4' })
+    } else {
+      blob = await response.blob()
+    }
+
     // The user picked their own file while the demo was downloading.
     if (request !== demoRequest) return
     selectFile(new File([blob], 'pipeline-tighter.m4a', { type: 'audio/mp4' }))
@@ -501,9 +574,14 @@ onUnmounted(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener('beforeunload', handleBeforeUnload)
   }
+  smoothProgress.destroy()
   if (activeWorker) {
     activeWorker.terminate()
     activeWorker = null
+  }
+  if (audioProcessorWorker) {
+    audioProcessorWorker.terminate()
+    audioProcessorWorker = null
   }
   if (originalAudioUrl.value) {
     URL.revokeObjectURL(originalAudioUrl.value)
@@ -612,7 +690,20 @@ async function extractWaveformFromM4a(buffer, refMaxRms = 0.001, sliceCount = 36
   const tempCtx = new AudioContextClass()
   try {
     const audioBuffer = await tempCtx.decodeAudioData(buffer.slice(0))
-    return computeWaveformPeaksFromAudioBuffer(audioBuffer, refMaxRms, sliceCount)
+    const channelBuffers = []
+    for (let ch = 0; ch < audioBuffer.numberOfChannels; ch++) {
+      channelBuffers.push(audioBuffer.getChannelData(ch).slice().buffer)
+    }
+    try {
+      const res = await runAudioProcessorTask(
+        'computePlanarPeaks',
+        { channelBuffers, refMaxRms, sliceCount },
+        channelBuffers
+      )
+      return res.peaks || []
+    } catch {
+      return computeWaveformPeaksFromAudioBuffer(audioBuffer, refMaxRms, sliceCount)
+    }
   } catch {
     return []
   } finally {
@@ -620,32 +711,18 @@ async function extractWaveformFromM4a(buffer, refMaxRms = 0.001, sliceCount = 36
   }
 }
 
-function createPreviewWav(pcmData, sampleRate, channels, sampleFormat) {
-  // PCM WAV is broadly playable in native browser audio controls, even when
-  // the browser can decode the chosen source format but cannot play it.
-  const pcm = new Int16Array(pcmData.length)
-  if (sampleFormat === 'float') {
-    for (let i = 0; i < pcm.length; i++) {
-      const sample = Math.max(-1, Math.min(1, pcmData[i]))
-      pcm[i] = Math.round(sample < 0 ? sample * 0x8000 : sample * 0x7FFF)
+async function readFileWithProgress(file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onprogress = (e) => {
+      if (e.lengthComputable && e.total > 0) {
+        onProgress(e.loaded / e.total)
+      }
     }
-  } else {
-    pcm.set(pcmData)
-  }
-  const wav = new ArrayBuffer(44 + pcm.byteLength)
-  const view = new DataView(wav)
-  const write = (offset, value) => {
-    for (let i = 0; i < value.length; i++) view.setUint8(offset + i, value.charCodeAt(i))
-  }
-  const blockAlign = channels * 2
-  write(0, 'RIFF'); view.setUint32(4, 36 + pcm.byteLength, true)
-  write(8, 'WAVE'); write(12, 'fmt '); view.setUint32(16, 16, true)
-  view.setUint16(20, 1, true); view.setUint16(22, channels, true)
-  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate * blockAlign, true)
-  view.setUint16(32, blockAlign, true); view.setUint16(34, 16, true)
-  write(36, 'data'); view.setUint32(40, pcm.byteLength, true)
-  new Int16Array(wav, 44).set(pcm)
-  return URL.createObjectURL(new Blob([wav], { type: 'audio/wav' }))
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error || new Error('Failed to read file'))
+    reader.readAsArrayBuffer(file)
+  })
 }
 
 async function decodeSelectedFile(file, request) {
@@ -655,17 +732,21 @@ async function decodeSelectedFile(file, request) {
     return
   }
   isDecoding.value = true
-  progress.value = 5
+  smoothProgress.reset(0)
   statusMessage.value = 'Reading audio file...'
-  const nextPaint = () => new Promise((resolve) => setTimeout(resolve, 30))
   let audioCtx
   let trickle
   try {
-    const fileBuffer = await file.arrayBuffer()
+    // Stage 1: Read file with real progress (0% -> 25% of overall decode pipeline)
+    const fileBuffer = await readFileWithProgress(file, (ratio) => {
+      if (request === decodeRequest) {
+        smoothProgress.set(Math.round(ratio * 25))
+      }
+    })
     if (request !== decodeRequest) return
-    progress.value = 25
+
+    smoothProgress.set(30)
     statusMessage.value = 'Decoding audio stream...'
-    await nextPaint()
 
     // decodeAudioData detaches fileBuffer, so keep a copy of M4A sources for tag carry-over.
     const fileBytes = new Uint8Array(fileBuffer)
@@ -683,33 +764,83 @@ async function decodeSelectedFile(file, request) {
       audioCtx = new AudioContextClass()
     }
 
-    // Steady, smooth progression while decodeAudioData runs asynchronously
+    // Stage 2: AudioContext.decodeAudioData (25% -> 55% of pipeline)
+    // decodeAudioData reports no progress, so creep toward (but never reach) the next stage.
+    smoothProgress.set(45)
     trickle = setInterval(() => {
-      if (request === decodeRequest && progress.value < 75) {
-        progress.value += Math.max(1, Math.round((75 - progress.value) / 6))
+      if (request === decodeRequest && smoothProgress.target < 54) {
+        smoothProgress.set(smoothProgress.target + Math.max(0.5, (54 - smoothProgress.target) / 8))
       }
-    }, 120)
-
-    const decodedBuffer = await audioCtx.decodeAudioData(fileBuffer)
-    clearInterval(trickle)
+    }, 150)
+    let decodedBuffer
+    try {
+      decodedBuffer = await audioCtx.decodeAudioData(fileBuffer)
+    } finally {
+      clearInterval(trickle)
+    }
     if (request !== decodeRequest) return
 
-    progress.value = 80
-    statusMessage.value = 'Processing PCM audio...'
-    await nextPaint()
+    smoothProgress.set(55)
+    statusMessage.value = 'Processing PCM and waveform in background...'
 
     const isHighPrecision = parsedBitDepth && parsedBitDepth > 16
     const sampleFormat = isHighPrecision ? 'float' : 'int16'
-    const pcmData = isHighPrecision
-      ? audioBufferToFloat32(decodedBuffer)
-      : audioBufferToPcm16(decodedBuffer)
+    const channels = decodedBuffer.numberOfChannels
+    const sampleRate = decodedBuffer.sampleRate
+    const duration = decodedBuffer.duration
 
-    progress.value = 90
-    statusMessage.value = 'Generating audio waveform...'
-    await nextPaint()
+    // Extract planar channels to transfer to worker
+    const channelBuffers = []
+    for (let ch = 0; ch < channels; ch++) {
+      channelBuffers.push(decodedBuffer.getChannelData(ch).slice().buffer)
+    }
 
-    // Extract high-resolution waveform peaks
-    const { peaks, maxRms } = computeWaveformPeaksFromPcm(pcmData, decodedBuffer.numberOfChannels, sampleFormat, 360)
+    let pcmData
+    let peaks
+    let maxRms
+    let wavBlob
+
+    // Stage 3: Audio processor worker tasks (55% -> 100% of pipeline, driven by worker progress)
+    try {
+      const workerRes = await runAudioProcessorTask(
+        'processDecodedAudio',
+        {
+          channelBuffers,
+          sampleRate,
+          sampleFormat,
+          sliceCount: 360,
+        },
+        channelBuffers,
+        (progressInfo) => {
+          if (request === decodeRequest) {
+            // Map worker progress (0-100%) to pipeline (55-98%)
+            const pipelineProgress = Math.round(55 + (progressInfo.progress / 100) * 43)
+            smoothProgress.set(pipelineProgress)
+            if (progressInfo.status) {
+              statusMessage.value = progressInfo.status
+            }
+          }
+        }
+      )
+      if (request !== decodeRequest) return
+      pcmData = sampleFormat === 'float'
+        ? new Float32Array(workerRes.pcmBuffer)
+        : new Int16Array(workerRes.pcmBuffer)
+      peaks = workerRes.peaks
+      maxRms = workerRes.maxRms
+      wavBlob = new Blob([workerRes.wavBuffer], { type: 'audio/wav' })
+    } catch (workerErr) {
+      // Fallback in case worker processing is unsupported
+      if (request !== decodeRequest) return
+      pcmData = isHighPrecision
+        ? audioBufferToFloat32(decodedBuffer)
+        : audioBufferToPcm16(decodedBuffer)
+      const res = computeWaveformPeaksFromPcm(pcmData, channels, sampleFormat, 360)
+      peaks = res.peaks
+      maxRms = res.maxRms
+      wavBlob = null
+    }
+
     originalPeaks.value = peaks
     referenceMaxRms.value = maxRms
 
@@ -717,21 +848,19 @@ async function decodeSelectedFile(file, request) {
       pcmData,
       sampleFormat,
       bitDepth: parsedBitDepth || (isHighPrecision ? 24 : 16),
-      sampleRate: decodedBuffer.sampleRate,
-      channels: decodedBuffer.numberOfChannels,
-      duration: decodedBuffer.duration,
+      sampleRate,
+      channels,
+      duration,
       sourceM4a,
     }
     if (originalAudioUrl.value) URL.revokeObjectURL(originalAudioUrl.value)
-    originalAudioUrl.value = createPreviewWav(pcmData, decodedBuffer.sampleRate, decodedBuffer.numberOfChannels, sampleFormat)
+    originalAudioUrl.value = wavBlob ? URL.createObjectURL(wavBlob) : ''
 
-    progress.value = 100
+    smoothProgress.set(100)
     statusMessage.value = 'Audio decoded and ready to encode.'
-    await nextPaint()
   } catch (err) {
     if (request === decodeRequest) statusMessage.value = 'Could not decode this audio: ' + err.message
   } finally {
-    clearInterval(trickle)
     if (request === decodeRequest) {
       isDecoding.value = false
     }
@@ -747,14 +876,11 @@ async function startEncoding() {
   activeTrackId.value = ''
 
   isProcessing.value = true
-  progress.value = 0
+  smoothProgress.reset(5)
   statusMessage.value = 'Preparing Web Worker encoding task…'
 
   try {
     const { pcmData, sampleFormat, sampleRate, channels, duration, bitDepth, sourceM4a } = decodedAudio.value
-    // Let the bar render at 0 before advancing; otherwise a rerun jumps 100 -> 5.
-    await new Promise((resolve) => setTimeout(resolve, 200))
-    progress.value = 5
     const workerUrl = new URL(withBase('/wasm/faac-worker.js'), window.location.origin).href
     const worker = new Worker(workerUrl)
     activeWorker = worker
@@ -762,11 +888,11 @@ async function startEncoding() {
     worker.onmessage = (e) => {
       const msg = e.data
       if (msg.type === 'progress') {
-        progress.value = msg.progress
+        smoothProgress.set(msg.progress)
         statusMessage.value = msg.status
       } else if (msg.type === 'complete') {
         activeWorker = null
-        progress.value = 100
+        smoothProgress.set(100)
         statusMessage.value = 'FAAC M4A encoding complete!'
         isProcessing.value = false
 
@@ -1288,15 +1414,15 @@ async function startEncoding() {
 }
 
 .result-meta {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  margin-top: 0.6rem;
 }
 
 .metadata-chip {
   min-width: 0;
-  padding: 0.45rem 0.65rem;
+  padding: 0.55rem 0.65rem;
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 8px;
   color: #e2e8f0;
