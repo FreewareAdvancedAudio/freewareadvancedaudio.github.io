@@ -14,6 +14,7 @@ docs/public/wasm/*
 # Demo media copied from the vendor/faac-media submodule at build time
 docs/public/media/*
 
-# Ignore auto-generated CLI docs
+# Ignore auto-generated CLI docs and changelog
 docs/docs/*-cli-gen.md
 docs/docs/*-api-gen.md
+docs/docs/changes.md

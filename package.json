@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "docs:generate-cli": "node scripts/generate-cli-docs.js",
+    "docs:generate-changelog": "node scripts/generate-changelog.js",
     "docs:dev": "node scripts/dev-docs.js",
-    "docs:build": "npm run docs:generate-cli && vitepress build docs",
+    "docs:build": "npm run docs:generate-cli && npm run docs:generate-changelog && vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "test": "vitest run"
   },

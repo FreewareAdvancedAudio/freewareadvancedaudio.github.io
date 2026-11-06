@@ -4,16 +4,22 @@ import { spawn, spawnSync } from 'node:child_process'
 
 const root = process.cwd()
 const generator = path.join(root, 'scripts/generate-cli-docs.js')
+const changelogGenerator = path.join(root, 'scripts/generate-changelog.js')
 const vitepress = path.join(root, 'node_modules/vitepress/bin/vitepress.js')
 const upstreamDocs = [
   ...['faac', 'faad', 'faam', 'faar'].map(name => `vendor/faac/docs/${name}.1`),
-  ...['libfaac', 'libfaad', 'libfaam', 'libfaar'].map(name => `vendor/faac/docs/${name}.md`)
+  ...['libfaac', 'libfaad', 'libfaam', 'libfaar'].map(name => `vendor/faac/docs/${name}.md`),
+  'vendor/faac/ChangeLog'
 ].map(file => path.join(root, file))
 
 function generateReferences() {
   const result = spawnSync(process.execPath, [generator], { cwd: root, stdio: 'inherit' })
   if (result.error) throw result.error
   if (result.status !== 0) throw new Error(`Reference generation failed with status ${result.status}`)
+
+  const clResult = spawnSync(process.execPath, [changelogGenerator], { cwd: root, stdio: 'inherit' })
+  if (clResult.error) throw clResult.error
+  if (clResult.status !== 0) throw new Error(`Changelog generation failed with status ${clResult.status}`)
 }
 
 generateReferences()

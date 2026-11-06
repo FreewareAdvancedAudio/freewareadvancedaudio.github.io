@@ -15,7 +15,8 @@ const docsSidebar = [
       { text: 'FAAC AAC Encoder', link: '/docs/faac' },
       { text: 'FAAD AAC Decoder', link: '/docs/faad' },
       { text: 'FAAM MP4 Muxer/Demuxer', link: '/docs/faam' },
-      { text: 'FAAR Sample Rate Converter', link: '/docs/faar' }
+      { text: 'FAAR Sample Rate Converter', link: '/docs/faar' },
+      { text: 'ChangeLog & History', link: '/docs/changes' }
     ]
   },
   {
@@ -269,7 +270,7 @@ export default defineConfig({
       { icon: 'github', link: 'https://github.com/FreewareAdvancedAudio/faac' }
     ],
     footer: {
-      message: `<span class="footer-links" role="navigation" aria-label="Footer"><a href="${base}docs/install"><i class="fa-solid fa-download" aria-hidden="true"></i> Download</a><a href="${base}docs/faac"><i class="fa-solid fa-book" aria-hidden="true"></i> Docs</a><a href="https://github.com/FreewareAdvancedAudio/faac"><i class="fa-brands fa-github" aria-hidden="true"></i> GitHub</a><a href="${base}feed.xml"><i class="fa-solid fa-rss" aria-hidden="true"></i> RSS</a></span><span class="footer-license">Documentation &amp; website content licensed under CC-BY-SA 4.0.</span><span class="footer-license">WebAssembly component code licensed under AGPL-3.0.</span>`,
+      message: `<span class="footer-links" role="navigation" aria-label="Footer"><a href="${base}docs/install"><i class="fa-solid fa-download" aria-hidden="true"></i> Download</a><a href="${base}docs/faac"><i class="fa-solid fa-book" aria-hidden="true"></i> Docs</a><a href="${base}docs/changes"><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i> Changes</a><a href="https://github.com/FreewareAdvancedAudio/faac"><i class="fa-brands fa-github" aria-hidden="true"></i> GitHub</a><a href="${base}feed.xml"><i class="fa-solid fa-rss" aria-hidden="true"></i> RSS</a></span><span class="footer-license">Documentation &amp; website content licensed under CC-BY-SA 4.0.</span><span class="footer-license">WebAssembly component code licensed under AGPL-3.0.</span>`,
       copyright: 'Copyright © 2026 Freeware Advanced Audio Organization'
     }
   }
