@@ -167,6 +167,23 @@ export default defineConfig({
       : null
     if (faq) head.push(['script', { type: 'application/ld+json' }, JSON.stringify(faq)])
 
+    if (path === 'playground' && !redirect) {
+      head.push(['script', { type: 'application/ld+json' }, JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'WebApplication',
+        name: 'Free Online AAC Encoder: WAV to M4A',
+        url,
+        applicationCategory: 'MultimediaApplication',
+        operatingSystem: 'Any',
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'USD'
+        },
+        description: 'Free, private, in-browser AAC encoder powered by FAAC. Convert WAV, MP3, FLAC and OGG to AAC (M4A) and compare bitrates and profiles.'
+      })])
+    }
+
     if (path.startsWith('docs/') && !redirect) {
       const group = docsSidebar.find(g => g.items.some(i => i.link === `/${path}`))
       const crumbs = [{ name: 'Home', item: root }]

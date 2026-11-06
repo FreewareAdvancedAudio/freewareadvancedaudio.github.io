@@ -53,7 +53,7 @@
               </span>
               <span class="metadata-chip">
                 <span class="metadata-label">Audio</span>
-                <template v-if="decodedAudio">{{ decodedAudio.sampleRate }} Hz · {{ formatChannelLayout(decodedAudio.channels) }} · {{ decodedAudio.bitDepth }}-bit</template>
+                <template v-if="decodedAudio">{{ formatSampleRate(decodedAudio.sampleRate) }} · {{ formatChannelLayout(decodedAudio.channels) }} · {{ decodedAudio.bitDepth }}-bit</template>
                 <template v-else>{{ isDecoding ? 'Decoding audio…' : 'Preparing audio…' }}</template>
               </span>
             </div>
@@ -130,7 +130,7 @@
       </div>
 
       <details class="advanced-settings" v-if="selectedFile">
-        <summary>More settings <span>{{ rateControl.toUpperCase() }} · {{ objectType === 'auto' ? 'Auto profile' : objectType === 'lc' ? 'AAC-LC' : 'HE-AAC v1' }} · {{ resampleMode === 'auto' ? 'Auto rate' : resampleMode === 'keep' ? 'Keep rate' : resampleHz + ' Hz' }}</span></summary>
+        <summary>More settings <span>{{ rateControl.toUpperCase() }} · {{ objectType === 'auto' ? 'Auto profile' : objectType === 'lc' ? 'AAC-LC' : 'HE-AAC v1' }} · {{ resampleMode === 'auto' ? 'Auto rate' : resampleMode === 'keep' ? 'Keep rate' : formatSampleRate(resampleHz) }}</span></summary>
         <div class="controls-grid">
           <div class="control-group">
             <label class="control-label" for="rate-control">Rate control</label>
@@ -165,8 +165,8 @@
               </button>
             </div>
             <select v-if="resampleMode === 'custom' && customRates.length" v-model.number="resampleHz"
-              class="rate-select" aria-label="Output sample rate in Hz" :disabled="isProcessing || isDecoding">
-              <option v-for="rate in customRates" :key="rate" :value="rate">{{ rate }} Hz</option>
+              class="rate-select" aria-label="Output sample rate in kHz" :disabled="isProcessing || isDecoding">
+              <option v-for="rate in customRates" :key="rate" :value="rate">{{ formatSampleRate(rate) }}</option>
             </select>
           </div>
         </div>
@@ -517,6 +517,12 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
 }
 
+function formatSampleRate(hz) {
+  if (!hz) return ''
+  const khz = hz / 1000
+  return `${Number(khz.toFixed(2))} kHz`
+}
+
 function formatChannelLayout(channels) {
   if (channels === 1) return 'Mono'
   if (channels === 2) return 'Stereo'
@@ -782,8 +788,8 @@ async function startEncoding() {
             label: 'Encoding',
             value: `${profileName} · ${modeLabel} · ${msg.resolvedRateControl === 'vbr' ? `Quality ${msg.resolvedQuality}` : `Target ${Math.round(msg.resolvedBitrate / 1000)} kbps`}`,
           },
-          { label: 'Input', value: `${sampleRate} Hz · ${bitDepth ? bitDepth + '-bit · ' : ''}${formatChannelLayout(channels)}` },
-          { label: 'Output', value: `${formatFileSize(outputBuffer.byteLength)} · ~${Math.round(averageKbps)} kbps${msg.resolvedSampleRate && msg.resolvedSampleRate !== sampleRate ? ` · resampled to ${msg.resolvedSampleRate} Hz` : ''}` },
+          { label: 'Input', value: `${formatSampleRate(sampleRate)} · ${bitDepth ? bitDepth + '-bit · ' : ''}${formatChannelLayout(channels)}` },
+          { label: 'Output', value: `${formatFileSize(outputBuffer.byteLength)} · ~${Math.round(averageKbps)} kbps${msg.resolvedSampleRate && msg.resolvedSampleRate !== sampleRate ? ` · resampled to ${formatSampleRate(msg.resolvedSampleRate)}` : ''}` },
         ]
 
         const resultItem = {

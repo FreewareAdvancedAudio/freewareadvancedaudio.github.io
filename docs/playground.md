@@ -1,11 +1,11 @@
 ---
-title: "Free Online AAC to M4A Converter"
-description: "Convert audio to AAC (M4A) in your browser with FAAC compiled to WebAssembly. Your files never leave your device; compare bitrates and profiles."
+title: "Free Online AAC Encoder: WAV to M4A"
+description: "Convert audio to AAC (M4A) in your browser with FAAC. Private, nothing is uploaded. Compare bitrates and profiles."
 ---
 
-# Try FAAC in Your Browser
+# Free Online AAC Encoder, Powered by FAAC
 
-Convert audio to M4A (AAC), listen to the result, and download it. Your files stay on your device and are never uploaded.
+Convert WAV, FLAC or MP3 to M4A (AAC) with [FAAC](/docs/faac), the open-source encoder, listen to the result, and download it. Your files stay on your device and are never uploaded.
 
 <WasmConverter />
 
@@ -33,14 +33,13 @@ Open **More settings** for these. The defaults suit most files.
 - Title, artist, album, track number and cover art, when the source is an M4A file. Other formats don't carry tags in.
 - A tag naming the FAAC version and the settings used.
 
-## Browser notes {data-icon="circle-play"}
+## Browser notes & privacy {data-icon="circle-play"}
 
-- Which input formats work depends on your browser's decoder. WAV, MP3, FLAC, OGG, M4A, AAC and WebM are common, but availability varies.
-- For WAV and FLAC, the page reads the sample rate from the file header (for example 44.1, 48 or 96 kHz) and asks the browser to decode at that rate. The browser decodes to 32-bit float, so 16- and 24-bit sources are held exactly.
-- For other formats the browser may resample to its own output rate, so use WAV or FLAC when sample-rate fidelity matters.
-- If the preview won't play an HE-AAC file, download it and open it in another player.
-- Speed depends on your device and browser.
+- **Private & client-side:** Audio files are processed locally in your browser and never uploaded to any server. There are no fees, accounts, or upload limits.
+- **Input formats:** Supported formats depend on your browser's decoder, including WAV, MP3, FLAC, OGG, M4A, AAC, and WebM.
+- **Sample rate accuracy:** For WAV and FLAC, the page reads the sample rate from the file header (such as 44.1, 48, or 96 kHz) and decodes to 32-bit float, preserving full bit depth. Other formats may be resampled by the browser to its native output rate, so use WAV or FLAC when sample-rate fidelity matters.
+- **Playback:** If your browser does not support in-page playback of HE-AAC streams, download the output M4A file and open it in an external media player.
 
 Keep your original lossless files.
 
-Looking for a codec to integrate? See [choosing an audio codec](/docs/comparison).
+Looking to integrate AAC encoding into your own software? See the [installation guide](/docs/install) and [implementation comparison](/docs/comparison).

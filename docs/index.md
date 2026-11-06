@@ -101,6 +101,7 @@ From camera firmware to desktop audio tools, these projects integrate FAAC or FA
 | [LightNVR](https://lightnvr.com/) | Bundles the [FAAC encoder](https://github.com/opensensor/lightNVR/blob/main/src/video/faac_encoder.c) to transcode camera audio to AAC in its open-source network video recorder. |
 | [VLC Media Player](https://github.com/videolan/vlc/blob/master/modules/codec/faad.c) | Includes a FAAD2 decoder integration. |
 | [fre:ac](https://github.com/enzo1982/freac/blob/master/Readme) | Uses FAAC and FAAD2 for AAC conversion in its audio converter and CD ripper. |
+| [AudioBook Boss](https://audiobookboss.app/) | Uses FAAC and FAAD3 to encode and decode AAC audio in its desktop audiobook manager. |
 
 Available libraries and features depend on each project's version and build. Report reproducible library problems in [FAAC and FAAD issues](https://github.com/FreewareAdvancedAudio/faac/issues), including your library version and settings.
 

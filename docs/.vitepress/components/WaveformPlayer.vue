@@ -589,16 +589,22 @@ function handleTrackPointerDown(event) {
   trackRef.value?.setPointerCapture?.(event.pointerId)
   isDraggingTrack.value = true
 
-  const seekTime = getTimeFromPointer(event)
+  seekAndPlay(getTimeFromPointer(event))
+}
 
-  // Update last started playback point to the clicked position
+// Jump to a time and mark it as the last started point. Playback continues (and switches to this
+// track in an A/B comparison) only if something is already playing; when paused or stopped,
+// clicking just moves the position.
+function seekAndPlay(seekTime) {
+  const keepPlaying = isPlaying.value || props.activeTrackId !== ''
+
   emit('update:playbackStartTime', seekTime)
   emit('seek', seekTime)
-  emit('play', { trackId: props.trackId })
+  if (keepPlaying) emit('play', { trackId: props.trackId })
 
   if (audioEl.value) {
     audioEl.value.currentTime = seekTime
-    audioEl.value.play().catch(() => {})
+    if (keepPlaying) audioEl.value.play().catch(() => {})
   }
 }
 
@@ -631,13 +637,22 @@ function handleTrackPointerCancel() {
 }
 
 // Trimmer Handle Pointer Events (iOS-style loop region trimmer)
+// A handle only starts dragging after a few pixels of movement. A plain tap on a handle
+// seeks like a click on the track, so the handles never block clicking the very start or end.
+const HANDLE_DRAG_THRESHOLD_PX = 4
+let pendingHandle = null // { handle, x }
+
 function handleHandlePointerDown(handle, event) {
   if (!totalDuration.value) return
-  activeDragHandle.value = handle
+  pendingHandle = { handle, x: event.clientX }
   event.currentTarget?.setPointerCapture?.(event.pointerId)
 }
 
 function handleHandlePointerMove(handle, event) {
+  if (pendingHandle?.handle === handle && activeDragHandle.value !== handle &&
+      Math.abs(event.clientX - pendingHandle.x) >= HANDLE_DRAG_THRESHOLD_PX) {
+    activeDragHandle.value = handle
+  }
   if (activeDragHandle.value !== handle || !trackRef.value || !totalDuration.value) return
   const rect = trackRef.value.getBoundingClientRect()
   const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
@@ -655,15 +670,20 @@ function handleHandlePointerMove(handle, event) {
 }
 
 function handleHandlePointerUp(handle, event) {
+  const wasTap = pendingHandle?.handle === handle && activeDragHandle.value !== handle
+  pendingHandle = null
+  try {
+    event.currentTarget?.releasePointerCapture?.(event.pointerId)
+  } catch {}
   if (activeDragHandle.value === handle) {
-    try {
-      event.currentTarget?.releasePointerCapture?.(event.pointerId)
-    } catch {}
     activeDragHandle.value = null
+  } else if (wasTap) {
+    seekAndPlay(getTimeFromPointer(event))
   }
 }
 
 function handleHandlePointerCancel(handle) {
+  pendingHandle = null
   if (activeDragHandle.value === handle) {
     activeDragHandle.value = null
   }
