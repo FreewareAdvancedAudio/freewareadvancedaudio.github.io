@@ -119,7 +119,7 @@ Use a package manager or build from source. The [installation guide](/docs/insta
 
 ### Which software license do FAAC and FAAD use?
 
-The FAAC encoder, FAAD3, FAAM and FAAR are LGPL v2.1+. Legacy FAAD2, which many package managers still ship as `faad2`, is GPL v2+. [Which version did I get?](/docs/install#which-version-did-i-get) Moving off FAAD2? See the [migration guide](/blog/faad3-release#moving-from-faad2).
+The FAAC encoder, FAAD3, FAAM and FAAR are LGPL v2.1+. Legacy FAAD2, which many package managers still ship as `faad2`, is GPL v2+. [Which version did I get?](/docs/install#which-version-did-i-get) Moving off FAAD2? See the [migration guide](/docs/faad#moving-from-faad2).
 
 ### Do AAC patents affect my use?
 

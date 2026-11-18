@@ -1,7 +1,7 @@
 ---
 title: "Introducing FAAD3, FAAM and FAAR"
 date: 2026-11-02
-description: "FAAD3 is a rewritten AAC decoder that replaces FAAD2, alongside the new FAAM MP4 muxer and FAAR resampler. Includes a packager checklist for moving off FAAD2."
+description: "FAAD3 is a rewritten AAC decoder that replaces FAAD2, alongside the new FAAM MP4 muxer and FAAR resampler. Existing FAAD2 software keeps working through a compatibility shim."
 ---
 
 # Introducing FAAD3, FAAM and FAAR
@@ -14,7 +14,7 @@ FAAD3 is a rewrite of the FAAD2 decoder as a C11 AAC decoder library and command
 
 **FAAD3 is LGPL; legacy FAAD2 is GPL.** FAAD3 is licensed under LGPL v2.1 or later, while legacy FAAD2 is GPL v2 or later, so closed-source applications can link FAAD3 under LGPL terms. See [software licenses and patent rights](/docs/comparison#software-licenses-and-patent-rights).
 
-**FAAD3 does not keep FAAD2's `NeAACDec*` API or ABI.** A GPL v2 or later compatibility shim covers software that cannot port yet; see [Moving from FAAD2 to FAAD3](#moving-from-faad2).
+**FAAD3 does not keep FAAD2's `NeAACDec*` API or ABI.** A GPL v2 or later compatibility shim covers software that cannot port yet; see [Moving from FAAD2 to FAAD3](/docs/faad#moving-from-faad2).
 
 ## FAAM: MP4, M4A and M4B without another toolchain
 
@@ -26,25 +26,7 @@ Encoders and devices want a fixed rate, and recordings rarely arrive at it. FAAR
 
 ## Moving from FAAD2 to FAAD3 {#moving-from-faad2}
 
-Two repositories divide the work:
-
-- **[FreewareAdvancedAudio/faac](https://github.com/FreewareAdvancedAudio/faac)** builds `libfaad3`, `libfaac`, `libfaam`, `libfaar` and the `faac`, `faad`, `faam` and `faar` tools.
-- **[FreewareAdvancedAudio/faad2](https://github.com/FreewareAdvancedAudio/faad2)** builds only the compatibility shim: `libfaad.so.2` with the legacy `NeAACDec*` API, which hands decoding to libfaad3 and resampling to libfaar. It ships no command-line tool and is GPL v2 or later.
-
-**For distribution packagers**
-
-1. **Point upstream** metadata at the FreewareAdvancedAudio organization.
-2. **Package the `faac` source** (until a release is tagged, build from the repository) as the suite: `libfaad3`, `libfaac`, `libfaam` and `libfaar`, their headers (`faad3.h` and so on) and pkg-config modules, and the `faac`, `faad`, `faam` and `faar` tools and man pages.
-3. **Package the `faad2` source** as the compatibility library, built against your packaged FAAC rather than its bundled `external/faac` submodule. That is the default (`FAAC_USE_BUNDLED_SOURCE=OFF`), and it needs a FAAC built with `-Ddecoder=true`. The shim depends on libfaad3 and libfaar, and its soname, header and pkg-config name differ from libfaad3's, so the two install side by side.
-4. **Resolve the `faad` file overlap.** The `faad` binary and `faad.1` now come from the faac-built package, not the shim, so add Conflicts/Replaces to avoid two packages owning the same files. The new `faad` keeps option letters such as `-o`, `-w`, `-b`, `-f` and `-d`, but not their arguments: `-f` takes `wav` or `raw` instead of `1` or `2`, `-b` takes `16`, `24`, `32` or `32f` instead of `1` to `5`, and `-d` now defaults to mono and accepts a layout instead of always downmixing 5.1 to stereo. Check scripts that call `faad` before replacing the old package.
-5. **Keep the shim until your reverse dependencies are ported,** then retire it. Use your distro's reverse-dependency tools to list packages that depend on `libfaad.so.2` or `faad2`.
-
-**For applications and new code**
-
-- **Apps on the legacy API:** they keep working with the shim, but output is not bit-identical to FAAD2. Test anything that relies on ADIF, LATM, DRM or the MAIN, LTP, SSR, LD and error-resilient profiles, which FAAD3 does not support. The [shim README](https://github.com/FreewareAdvancedAudio/faad2) lists every difference.
-- **Porting:** follow the [porting notes](/docs/libfaad#porting-from-the-legacy-neaacdec-api).
-- **New code:** link `libfaad3` directly, not the shim.
-- **Checking a machine:** see [Which version did I get?](/docs/install#which-version-did-i-get).
+There is no flag day: FAAD3 installs side by side with FAAD2, and the FAAD2 compatibility shim (GPL v2+) in the [faad2 repository](https://github.com/FreewareAdvancedAudio/faad2) keeps `libfaad.so.2` working until reverse dependencies are ported. The [FAAD guide](/docs/faad#moving-from-faad2) has the packager checklist and how to build an application against both libraries.
 
 ## Benchmarks and documentation
 
