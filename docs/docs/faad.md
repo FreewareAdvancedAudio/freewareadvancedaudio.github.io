@@ -22,7 +22,7 @@ FAAD supports **AAC-LC**, **HE-AAC v1**, and **HE-AAC v2 Parametric Stereo** whe
 | Decode files from a terminal | [FAAD command-line manual](/docs/faad-cli) |
 | Embed AAC decoding in a C application | [libfaad C API reference](/docs/libfaad) |
 | Build FAAD from source | [Installation guide](/docs/install) |
-| Port an application from FAAD2 | [FAAD2 migration notes](/docs/libfaad#porting-from-the-legacy-neaacdec-api) |
+| Port an application from FAAD2 | [FAAD2 migration notes](/docs/libfaad#porting-from-the-legacy-neaacdec-api) and the [packager and maintainer guide](/blog/faad3-release#moving-from-faad2) |
 | Compare profiles, implementations, and licenses | [Encoder and decoder comparison](/docs/comparison) |
 
 ## Evaluate decoder performance and quality

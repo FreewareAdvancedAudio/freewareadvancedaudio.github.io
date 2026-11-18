@@ -54,7 +54,10 @@ Package managers mostly ship the older FAAD2 decoder, not the current FAAD3 libr
 | Decoder | License | API | How to tell |
 | :--- | :--- | :--- | :--- |
 | FAAD2 (legacy, no longer supported; `faad2` packages) | GPL v2+ | `NeAACDec*` in `neaacdec.h` or `faad.h` | `pkg-config --modversion faad2` prints a version |
+| FAAD2 compatibility shim (GPL v2+, delegates to FAAD3) | GPL v2+ | `NeAACDec*` in `neaacdec.h` or `faad.h` | `faad2` also reports a FAAD2 version, so check `pkg-config --list-all`: the shim's description reads "FAAD2 compatibility shim over libfaad3" |
 | FAAD3 (current, build from source) | LGPL v2.1+ | `faad_*` in `faad3.h` | `pkg-config --modversion faad3` prints a version |
+
+Packagers and maintainers moving off FAAD2: see the [migration guide](/blog/faad3-release#moving-from-faad2).
 
 FAAC 2.2 is the latest release; FAAD3, FAAM and FAAR are in development and available from source. For closed-source linking, use FAAC 2.0 or later and FAAD3. See [software licenses](/docs/comparison#software-licenses-and-patent-rights).
 
