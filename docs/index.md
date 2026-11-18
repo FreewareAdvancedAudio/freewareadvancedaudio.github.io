@@ -60,7 +60,7 @@ Every feature is a build option: HE-AAC (SBR), HE-AAC v2 (PS), DAB frames, dynam
 
 <Esp32Showcase view="build" />
 
-## Every AAC profile. Real time. On an ESP32. {data-icon="microchip"}
+## AAC-LC and HE-AAC. Faster than real time. On an ESP32. {data-icon="microchip"}
 
 The same FAAC and FAAD libraries that lead on powerful machines also run in real time on the ESP32-S3 and the original ESP32. Even the original ESP32, without PSRAM, decodes AAC-LC and HE-AAC v1 in real time.
 
@@ -96,11 +96,11 @@ From camera firmware to desktop audio tools, these projects integrate FAAC or FA
 
 | Project | Integration |
 | :--- | :--- |
-| [Thingino](https://github.com/themactep/thingino-firmware/blob/stable/package/faac/faac.mk) | Packages FAAC for open-source firmware for Ingenic IP cameras. |
-| GStreamer | Provides [FAAC encoding](https://gstreamer.freedesktop.org/documentation/faac/index.html) and [FAAD2 decoding](https://gstreamer.freedesktop.org/documentation/faad/index.html) elements for multimedia pipelines. |
+| [Thingino](https://thingino.com/) | [Packages FAAC](https://github.com/themactep/thingino-firmware/blob/stable/package/faac/faac.mk) for open-source firmware for Ingenic IP cameras. |
+| [GStreamer](https://gstreamer.freedesktop.org/) | Provides [FAAC encoding](https://gstreamer.freedesktop.org/documentation/faac/index.html) and [FAAD2 decoding](https://gstreamer.freedesktop.org/documentation/faad/index.html) elements for multimedia pipelines. |
 | [LightNVR](https://lightnvr.com/) | Bundles the [FAAC encoder](https://github.com/opensensor/lightNVR/blob/main/src/video/faac_encoder.c) to transcode camera audio to AAC in its open-source network video recorder. |
-| [VLC Media Player](https://github.com/videolan/vlc/blob/master/modules/codec/faad.c) | Includes a FAAD2 decoder integration. |
-| [fre:ac](https://github.com/enzo1982/freac/blob/master/Readme) | Uses FAAC and FAAD2 for AAC conversion in its audio converter and CD ripper. |
+| [VLC Media Player](https://www.videolan.org/vlc/) | Includes a [FAAD2 decoder integration](https://github.com/videolan/vlc/blob/master/modules/codec/faad.c). |
+| [fre:ac](https://www.freac.org/) | [Uses FAAC and FAAD2](https://github.com/enzo1982/freac/blob/master/Readme) for AAC conversion in its audio converter and CD ripper. |
 | [AudioBook Boss](https://audiobookboss.app/) | Uses FAAC and FAAD3 to encode and decode AAC audio in its desktop audiobook manager. |
 
 Available libraries and features depend on each project's version and build. Report reproducible library problems in [FAAC and FAAD issues](https://github.com/FreewareAdvancedAudio/faac/issues), including your library version and settings.

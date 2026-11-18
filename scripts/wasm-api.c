@@ -178,15 +178,15 @@ wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
         goto fail;
     }
 
-    /* Rate selection (--rate auto|keep|hz), after encode_engine.c's rate_auto block, but only where
-     * the profile can't change at the new rate: explicit LC, or AUTO above
-     * 48 kHz. HE-AAC and AUTO at lower rates keep the source rate, so no probe
-     * is needed. Skipped for VBR, which has no per-channel bitrate. */
+    /* Rate selection (--rate auto|keep|hz), following encode_engine.c's rate_auto block branch for
+     * branch: above 48 kHz downsample to 44.1/48 kHz; otherwise, for 48 kHz and 44.1 kHz
+     * families at low per-channel bitrates, drop to 32 kHz when the profile AUTO resolves to
+     * is AAC-LC, or when it is stereo HE-AAC at 48 kHz and at most 5 kbps per channel. The
+     * resolved profile is probed with a throwaway encoder, as the CLI does, and then pinned so
+     * it cannot change at the new rate. Skipped for VBR, which has no per-channel bitrate. */
     session->source_rate = sample_rate;
     uint32_t target_rate = sample_rate > 96000 ? 96000 : sample_rate;
     const uint32_t rate_per_channel = params.bit_rate / channels;
-    const int is_lc = object_type == FAAC_OBJ_LC;
-    const int auto_high = params.object_type == FAAC_OBJ_AUTO && sample_rate > 48000;
     /* --rate: 0 = auto, 1 = keep the input rate, else an explicit lower rate. */
     if (rate_request > 1) {
         if (rate_request >= sample_rate || rate_request < 7350 || rate_request > 96000) {
@@ -194,15 +194,37 @@ wasm_converter *wasm_converter_open(uint32_t sample_rate, uint32_t channels,
             goto fail;
         }
         target_rate = rate_request;
-    } else if (rate_request == 0 && rate_per_channel > 0 && (is_lc || auto_high)) {
+    } else if (rate_request == 0 && rate_per_channel > 0) {
         const uint32_t lc_48k_bps = 19000;
         const uint32_t lc_44k_bps = 11000;
-        if (sample_rate > 48000)
+        const uint32_t he_48k_bps = 5000;
+        if (sample_rate > 48000) {
             target_rate = (sample_rate % 44100 == 0) ? 44100 : 48000;
-        else if (is_lc && sample_rate > 32000 &&
-                 ((sample_rate % 8000 == 0 && rate_per_channel <= lc_48k_bps) ||
-                  (sample_rate % 11025 == 0 && rate_per_channel <= lc_44k_bps)))
-            target_rate = 32000;
+        } else if (sample_rate > 32000 &&
+                   ((sample_rate % 8000 == 0 && rate_per_channel <= lc_48k_bps) ||
+                    (sample_rate % 11025 == 0 && rate_per_channel <= lc_44k_bps))) {
+            faac_encoder *probe = NULL;
+            *status = faac_encoder_open(&params, &probe);
+            if (*status != FAAC_OK)
+                goto fail;
+            faac_encoder_info probe_info = { .struct_size = sizeof(probe_info) };
+            faac_status probe_status = faac_encoder_get_info(probe, &probe_info);
+            faac_encoder_close(&probe);
+            if (probe_status != FAAC_OK) {
+                *status = probe_status;
+                goto fail;
+            }
+            if (probe_info.object_type == FAAC_OBJ_LC) {
+                target_rate = 32000;
+                params.object_type = FAAC_OBJ_LC;
+            } else if (channels == 2 && sample_rate == 48000 &&
+                       rate_per_channel <= he_48k_bps &&
+                       (probe_info.object_type == FAAC_OBJ_HE_AAC_V1 ||
+                        probe_info.object_type == FAAC_OBJ_HE_AAC_V2)) {
+                target_rate = 32000;
+                params.object_type = probe_info.object_type;
+            }
+        }
     }
     if (target_rate > 96000)
         target_rate = 96000;

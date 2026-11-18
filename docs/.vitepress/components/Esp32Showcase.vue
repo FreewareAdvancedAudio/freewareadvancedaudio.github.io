@@ -6,9 +6,9 @@ const metrics = [
   {
     icon: 'bolt',
     title: 'ESP32-S3 benchmark',
-    value: 'Every profile',
-    unit: 'in real time',
-    summary: 'AAC-LC, HE-AAC v1 and HE-AAC v2, encode and decode, on an ESP32-S3.',
+    value: '2–13×',
+    unit: 'faster than real time',
+    summary: 'AAC-LC, HE-AAC v1 and v2, encode and decode, on an ESP32-S3.',
     rows: [] as { name: string; value: number; label: string; tone: string }[],
     note: 'Relative to real time · higher is better'
   },
