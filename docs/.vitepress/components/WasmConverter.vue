@@ -101,9 +101,9 @@
               type="range"
               :disabled="isProcessing"
               v-model.number="bitrate"
-              min="32"
+              min="16"
               max="320"
-              step="16"
+              step="8"
               class="range-slider"
             />
           </div>
@@ -177,22 +177,22 @@
         <button
           ref="convertButton"
           class="convert-btn"
+          :class="{ 'is-busy': isDecoding || isProcessing }"
           :disabled="isProcessing || isDecoding || !decodedAudio"
           @click="startEncoding"
         >
-          <span v-if="isDecoding"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Decoding audio… {{ progress }}%</span>
-          <span v-else-if="!isProcessing">
+          <span class="convert-fill" :key="progressRunId" :style="{ transform: `scaleX(${progress / 100})` }" aria-hidden="true"></span>
+          <span v-if="isDecoding" class="convert-label"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Decoding audio… {{ progress }}%</span>
+          <span v-else-if="!isProcessing" class="convert-label">
             <i class="fa-solid fa-file-audio" aria-hidden="true"></i> Convert to M4A
           </span>
-          <span v-else>
+          <span v-else class="convert-label">
             <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Encoding… {{ progress }}%
           </span>
         </button>
 
-        <div class="progress-bar-bg" v-if="isDecoding || isProcessing || progress === 100" role="progressbar"
-             aria-label="Audio conversion" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100">
-          <div class="progress-bar-fill" :style="{ transform: `scaleX(${progress / 100})` }"></div>
-        </div>
+        <div class="sr-only" v-if="isDecoding || isProcessing" role="progressbar"
+             aria-label="Audio conversion" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100"></div>
 
         <div class="status-msg" role="status" aria-live="polite" v-if="statusMessage">
           {{ statusMessage }}
@@ -333,6 +333,8 @@ const customRates = computed(() => {
 })
 const isProcessing = ref(false)
 const progress = ref(0)
+// Bumped at each phase start so the button's fill element is re-created at 0 (abrupt reset, smooth climb)
+const progressRunId = ref(0)
 const statusMessage = ref('')
 const smoothProgress = createSmoothProgress((val) => {
   progress.value = val
@@ -732,6 +734,7 @@ async function decodeSelectedFile(file, request) {
     return
   }
   isDecoding.value = true
+  progressRunId.value++
   smoothProgress.reset(0)
   statusMessage.value = 'Reading audio file...'
   let audioCtx
@@ -876,7 +879,9 @@ async function startEncoding() {
   activeTrackId.value = ''
 
   isProcessing.value = true
-  smoothProgress.reset(5)
+  progressRunId.value++
+  smoothProgress.reset(0)
+  smoothProgress.set(5)
   statusMessage.value = 'Preparing Web Worker encoding task…'
 
   try {
@@ -943,6 +948,7 @@ async function startEncoding() {
       } else if (msg.type === 'error') {
         activeWorker = null
         statusMessage.value = 'Worker Error: ' + msg.message
+        smoothProgress.set(100, true)
         isProcessing.value = false
         worker.terminate()
       }
@@ -951,6 +957,7 @@ async function startEncoding() {
     worker.onerror = () => {
       activeWorker = null
       statusMessage.value = 'The audio converter could not run. Please reload the page and try again.'
+      smoothProgress.set(100, true)
       isProcessing.value = false
       worker.terminate()
     }
@@ -974,6 +981,7 @@ async function startEncoding() {
 
   } catch (err) {
     statusMessage.value = 'Error: ' + err.message
+    smoothProgress.set(100, true)
     isProcessing.value = false
   }
 }
@@ -1309,8 +1317,10 @@ async function startEncoding() {
 }
 
 .convert-btn {
+  position: relative;
+  overflow: hidden;
   width: 100%;
-  background: linear-gradient(90deg, #10b981, #06b6d4);
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.3), rgba(6, 182, 212, 0.3));
   color: #ffffff;
   border: none;
   border-radius: 10px;
@@ -1325,6 +1335,22 @@ async function startEncoding() {
   gap: 0.5rem;
 }
 
+.convert-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, #10b981, #06b6d4);
+  transform-origin: left center;
+  will-change: transform;
+  transition: transform 0.15s linear;
+  pointer-events: none;
+}
+
+.convert-label {
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 1px 2px rgba(15, 23, 42, 0.5);
+}
+
 .convert-btn:hover:not(:disabled) {
   opacity: 0.9;
 }
@@ -1334,23 +1360,18 @@ async function startEncoding() {
   cursor: not-allowed;
 }
 
-.progress-bar-bg {
-  width: 100%;
-  height: 6px;
-  background: #0f172a;
-  border-radius: 3px;
-  margin-top: 0.75rem;
-  overflow: hidden;
+.convert-btn.is-busy:disabled {
+  opacity: 1;
+  cursor: progress;
 }
 
-.progress-bar-fill {
-  display: block;
-  height: 6px;
-  width: 100%;
-  transform-origin: left center;
-  will-change: transform;
-  background: linear-gradient(90deg, #10b981, #38bdf8);
-  transition: transform 0.1s linear;
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 
 .status-msg {

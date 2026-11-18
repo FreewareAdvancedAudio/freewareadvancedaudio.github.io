@@ -299,8 +299,25 @@ const currentProgressPercent = computed(() => {
   return Math.min(100, Math.max(0, pct))
 })
 
+// Non-active players only receive sharedTime in ~250ms steps from the active player's
+// timeupdate events. While something is playing, glide between steps instead of jumping;
+// when nothing plays (seeks/drags) snap immediately.
+const followsSharedPlayback = computed(() => !isSelfActive.value && !!props.activeTrackId && !followSnap.value)
+const followTransitionMs = 250
+// Set briefly when shared time jumps (loop wrap / seek) so followers snap instead of sweeping back.
+const followSnap = ref(false)
+// Aim one update interval ahead of the reported time: the glide then arrives at the
+// target exactly when real playback reaches it, so there is no visible lag vs. the active player.
+const followPercent = computed(() => {
+  if (!totalDuration.value || totalDuration.value <= 0) return 0
+  const end = isTrimmed.value ? loopEnd.value : totalDuration.value
+  const ahead = Math.min(end, (props.sharedTime || 0) + followTransitionMs / 1000)
+  const time = Math.max(props.sharedTime || 0, ahead)
+  return Math.min(100, Math.max(0, (time / totalDuration.value) * 100))
+})
+
 const playedProgressStyle = computed(() => {
-  const widthPct = isTransitioning.value ? targetProgressPercent.value : currentProgressPercent.value
+  const widthPct = isTransitioning.value ? targetProgressPercent.value : (followsSharedPlayback.value ? followPercent.value : currentProgressPercent.value)
   if (isTransitioning.value && transitionDurationSec.value > 0) {
     return {
       width: `${widthPct}%`,
@@ -309,12 +326,12 @@ const playedProgressStyle = computed(() => {
   }
   return {
     width: `${widthPct}%`,
-    transition: 'none',
+    transition: followsSharedPlayback.value ? `width ${followTransitionMs}ms linear` : 'none',
   }
 })
 
 const playheadProgressStyle = computed(() => {
-  const leftPct = isTransitioning.value ? targetProgressPercent.value : currentProgressPercent.value
+  const leftPct = isTransitioning.value ? targetProgressPercent.value : (followsSharedPlayback.value ? followPercent.value : currentProgressPercent.value)
   if (isTransitioning.value && transitionDurationSec.value > 0) {
     return {
       left: `${leftPct}%`,
@@ -323,7 +340,7 @@ const playheadProgressStyle = computed(() => {
   }
   return {
     left: `${leftPct}%`,
-    transition: 'none',
+    transition: followsSharedPlayback.value ? `left ${followTransitionMs}ms linear` : 'none',
   }
 })
 
@@ -513,10 +530,10 @@ function handleTimeUpdate() {
     // Check loop / trimmed end wrap-around
     if (isTrimmed.value && curTime >= loopEnd.value) {
       if (isRepeatEnabled.value) {
-        audioEl.value.currentTime = loopStart.value
-        localPlayTime.value = loopStart.value
-        emit('timeupdate', loopStart.value)
-        emit('seek', loopStart.value)
+        audioEl.value.currentTime = restartPoint()
+        localPlayTime.value = restartPoint()
+        emit('timeupdate', restartPoint())
+        emit('seek', restartPoint())
         startCssPlaybackTransition()
         return
       } else {
@@ -535,21 +552,27 @@ function handleTimeUpdate() {
   }
 }
 
+// Where playback restarts: the trim start if a region is set, else the real start.
+function restartPoint() {
+  return isTrimmed.value ? loopStart.value : 0
+}
+
 function handleEnded() {
   isPlaying.value = false
-  stopPlaybackLoop()
+  stopCssPlaybackTransition()
+  const targetStart = restartPoint()
   if (isRepeatEnabled.value) {
-    // If repeat is ON, wrap to loopStart (or 0) and replay
-    const targetStart = isTrimmed.value ? loopStart.value : 0
+    // If repeat is ON, wrap to the restart point and replay
     if (audioEl.value) {
       audioEl.value.currentTime = targetStart
       localPlayTime.value = targetStart
       emit('seek', targetStart)
       audioEl.value.play().catch(() => {})
+      startCssPlaybackTransition()
     }
   } else {
-    localPlayTime.value = isTrimmed.value ? loopStart.value : 0
-    emit('seek', isTrimmed.value ? loopStart.value : 0)
+    localPlayTime.value = targetStart
+    emit('seek', targetStart)
   }
 }
 
@@ -560,12 +583,15 @@ function togglePlay() {
   } else {
     // Start playback: ensure audio is synced to sharedTime and within loop bounds
     let targetTime = props.sharedTime
-    if (isTrimmed.value && (targetTime >= loopEnd.value || targetTime < loopStart.value)) {
-      targetTime = loopStart.value
+    const atEnd = totalDuration.value > 0 && targetTime >= totalDuration.value - 0.05
+    if (atEnd || targetTime < 0 || (isTrimmed.value && (targetTime >= loopEnd.value || targetTime < loopStart.value))) {
+      targetTime = restartPoint()
     }
     if (Math.abs(audioEl.value.currentTime - targetTime) > 0.05) {
       audioEl.value.currentTime = targetTime
     }
+    // Sync the shared time first so the activeTrackId watcher doesn't restore a stale end position
+    if (Math.abs(props.sharedTime - targetTime) > 0.001) emit('seek', targetTime)
     emit('update:playbackStartTime', targetTime)
     emit('play', { trackId: props.trackId })
     audioEl.value.play().catch(() => {})
@@ -754,6 +780,13 @@ watch(effectiveMuted, (newVal) => {
 }, { immediate: true })
 
 // Watch sharedTime from parent: sync audio element when not actively updating itself
+watch(() => props.sharedTime, (n, o) => {
+  if (!isSelfActive.value && props.activeTrackId && (n < o - 0.01 || n - o > 1)) {
+    followSnap.value = true
+    requestAnimationFrame(() => requestAnimationFrame(() => { followSnap.value = false }))
+  }
+}, { flush: 'sync' })
+
 watch(() => props.sharedTime, (newTime) => {
   if (!audioEl.value) return
   if (!isSelfActive.value || isDraggingTrack.value) {
