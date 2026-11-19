@@ -6,7 +6,7 @@ description: "FAAD3 is a rewritten AAC decoder that replaces FAAD2, alongside th
 
 # Introducing FAAD3, FAAM and FAAR
 
-The next FAAC release is a suite of four C11 libraries and command-line tools under **LGPL v2.1 or later**: **FAAC** encodes, **FAAD** decodes, **FAAM** muxes and demuxes MP4, and **FAAR** resamples. FAAD3, FAAM and FAAR are new in it, and you can build them from [source](/docs/install#build-the-current-libraries-and-tools-from-source) today. Each does one job, so a project can use one piece or all four.
+FAAC 3.0 is a suite of four C11 libraries and command-line tools under **LGPL v2.1 or later**: **FAAC** encodes, **FAAD** decodes, **FAAM** muxes and demuxes MP4, and **FAAR** resamples. FAAD3, FAAM and FAAR are new in it, and shipped in [FAAC 3.0](/blog/faac-3-0-release). Each does one job, so a project can use one piece or all four.
 
 ## FAAD3: a decoder that replaces FAAD2
 

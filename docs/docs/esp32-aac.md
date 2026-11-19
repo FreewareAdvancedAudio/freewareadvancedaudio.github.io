@@ -157,4 +157,4 @@ Not measured. The decoder tests covered stereo.
 
 ## Benchmark notes
 
-The RAM, footprint, HE-AAC v2 and 5.1 figures on this page come from on-device runs of FAAC and FAAD at 3.0.0 (`daf64763`) on ESP-IDF v5.5.5, using an ESP32-S3 (8 MB PSRAM), an ESP32-C6 and a classic ESP32 without PSRAM. Speed ranges for AAC-LC and HE-AAC v1 come from the [full ESP32 AAC benchmark notes](https://gist.github.com/nschimme/cfa0a3d225c8c001eb7d998739b7298a), which cover earlier builds, scenarios, and exact numbers.
+The RAM, footprint, HE-AAC v2 and 5.1 figures on this page come from on-device runs of FAAC and FAAD at 3.0.0 (`daf64763`, a pre-release build) on ESP-IDF v5.5.5, using an ESP32-S3 (8 MB PSRAM), an ESP32-C6 and a classic ESP32 without PSRAM. Speed ranges for AAC-LC and HE-AAC v1 come from the [full ESP32 AAC benchmark notes](https://gist.github.com/nschimme/cfa0a3d225c8c001eb7d998739b7298a), which cover earlier builds, scenarios, and exact numbers.

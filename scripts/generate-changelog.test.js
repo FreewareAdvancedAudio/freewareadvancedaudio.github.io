@@ -122,7 +122,8 @@ v2.0 - 2026-07-20
     const raw = fs.readFileSync(path.resolve(process.cwd(), 'vendor/faac/ChangeLog'), 'utf8');
     const versions = parseChangeLog(raw);
     expect(versions.length).toBeGreaterThanOrEqual(20);
-    expect(versions[0].title).toBe('Unreleased');
-    expect(versions[1].title).toBe('2.2');
+    // The newest entry is either an unreleased section or a released version.
+    expect(versions[0].title).toMatch(/^(Unreleased|\d+\.\d+(\.\d+)?)$/);
+    expect(versions.map((v) => v.title)).toContain('2.2');
   });
 });

@@ -36,7 +36,7 @@ The FAAC project wrote this page and ran the [benchmark](/docs/aac-benchmark) it
 | 16–96 kbps | **HE-AAC v1** | FAAC, FDK-AAC, Apple, Ittiam. Not FFmpeg `aac`. | Expired |
 | 16–24 kbps | **HE-AAC v2** | FDK-AAC, Apple, Ittiam, or FAAC with `encoder-ps` (off by default) | Parametric Stereo to 2030 |
 
-Profiles are not a quality ladder; each wins in a range. These ranges come from the FAAC project's benchmark at 48 kHz stereo ([full report](https://gist.github.com/nschimme/42630f7e02f53367d6374ebd05864136)). At 48 kbps, FAAC scores 4.348 MOS with HE-AAC v1 and 4.175 with LC. HE-AAC v2 leads at 16 kbps for FAAC, FDK-AAC and Ittiam. At 24 kbps it leads for FDK-AAC, Apple and Ittiam, while FAAC's HE-AAC v1 scores 3.464 against 3.306 for v2.
+Profiles are not a quality ladder; each wins in a range. These ranges come from the FAAC project's benchmark at 48 kHz stereo ([full report](https://github.com/nschimme/faac-benchmark/discussions/127)). At 48 kbps, FAAC scores 4.348 MOS with HE-AAC v1 and 4.175 with LC. HE-AAC v2 leads at 16 kbps for FAAC, FDK-AAC and Ittiam. At 24 kbps it leads for FDK-AAC, Apple and Ittiam, while FAAC's HE-AAC v1 scores 3.464 against 3.306 for v2.
 
 Crossovers vary by encoder, sample rate and content. Test your own audio with the [browser converter](/playground) or the [listening guide](/docs/listening).
 

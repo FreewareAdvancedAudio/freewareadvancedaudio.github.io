@@ -81,18 +81,18 @@ With the default build, FAAC and FAAD3 together are under a third of FDK-AAC's s
 ## How the measurements are made {data-icon="flask"}
 
 - **Quality** is objective: ViSQOL scores speech and Zimtohrli scores music, each compared with the source. These are estimates, not listening-test results; [test audible quality](/docs/listening) yourself before relying on them. The suite covers mono speech, stereo music and multichannel audio at several sample rates, and also tracks difficult passages, transient timing and stereo image.
-- **Bitrate** on the chart is the requested target bitrate, not the actual payload rate. Actual payload rates and bitrate accuracy are in the [full report](https://gist.github.com/nschimme/42630f7e02f53367d6374ebd05864136).
+- **Bitrate** on the chart is the requested target bitrate, not the actual payload rate. Actual payload rates and bitrate accuracy are in the [full report](https://github.com/nschimme/faac-benchmark/discussions/127).
 - **Speed and footprint** are throughput (audio duration per unit of processing time), peak process memory, and ROM image (`.text` + `.rodata` + `.data`, not the installed package size), recorded with each build's toolchain and settings.
 
 These figures are for one machine. Measure your own build on your target device: throughput alone does not establish live-audio delay or power use. Definitions are in the [benchmark docs](https://github.com/nschimme/faac-benchmark/blob/master/docs/metrics.md), with the [test scenarios](https://github.com/nschimme/faac-benchmark/blob/master/docs/benchmarking.md) and [footprint checks](https://github.com/nschimme/faac-benchmark/blob/master/docs/footprint-gate.md).
 
 ## Tested versions {data-icon="flask"}
 
-Run on November 18, 2026 (MacBook Pro M1, 32 GB). Throughput, peak RAM and ROM image are covered in the sections above; the [full leaderboard](https://gist.github.com/nschimme/42630f7e02f53367d6374ebd05864136) has per-scenario results, profile breakdowns and bitrate accuracy.
+Run on November 18, 2026 (MacBook Pro M1, 32 GB). Throughput, peak RAM and ROM image are covered in the sections above; the [full leaderboard](https://github.com/nschimme/faac-benchmark/discussions/127) has per-scenario results, profile breakdowns and bitrate accuracy.
 
 | Implementation | Tested version or build | Tested as |
 | :--- | :--- | :--- |
-| FAAC / FAAD3 | 3.0.0 (`53eca6d3`) | Encoder / decoder |
+| FAAC / FAAD3 | 3.0.0 (`63f5a05b`; encoder built with `-Dencoder-ps=true`) | Encoder / decoder |
 | FDK-AAC | 1.0.9 (encoder), 2.0.0 (decoder) | Encoder / decoder |
 | Apple AAC | 27.2.1 | Encoder / decoder |
 | FFmpeg AAC | N-127192-gef52e1cc38, experimental NMR (encoder) | Encoder / decoder |

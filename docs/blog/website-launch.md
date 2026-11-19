@@ -47,6 +47,6 @@ If older FAAC releases disappointed you, we welcome your scrutiny of the current
 
 ## Future Roadmap
 
-We continue to tune FAAC and are preparing **FAAD3**, a C11 rewrite that replaces the earlier FAAD2 decoder, along with the **FAAM** MP4 muxer and **FAAR** resampler. All use **LGPL v2.1+**. Read [the FAAD3 announcement](/blog/faad3-release) and the [FAAD API guide](/docs/libfaad).
+We continue to tune FAAC and have since released **FAAD3**, a C11 rewrite that replaces the earlier FAAD2 decoder, in [FAAC 3.0](/blog/faac-3-0-release), along with the **FAAM** MP4 muxer and **FAAR** resampler. All use **LGPL v2.1+**. Read [the FAAD3 announcement](/blog/faad3-release) and the [FAAD API guide](/docs/libfaad).
 
 Stay tuned for more updates!

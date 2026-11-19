@@ -46,7 +46,7 @@ No flag day: FAAD3 and the shim install side by side.
 
 ### For distribution packagers
 
-1. **Add FAAD3 alongside.** Point upstream metadata at the FreewareAdvancedAudio organization. Package the `faac` source (until a release is tagged, build from the repository) as the suite: `libfaad3`, `libfaac`, `libfaam` and `libfaar`, their headers and pkg-config modules, and the four tools and man pages.
+1. **Add FAAD3 alongside.** Point upstream metadata at the FreewareAdvancedAudio organization. Package the `faac` source (from the FAAC 3.0 release or the repository) as the suite: `libfaad3`, `libfaac`, `libfaam` and `libfaar`, their headers and pkg-config modules, and the four tools and man pages.
 2. **Replace the `faad2` source with the shim.** Build it against your packaged FAAC rather than its bundled `external/faac` submodule. That is the default (`FAAC_USE_BUNDLED_SOURCE=OFF`), and it needs a FAAC built with `-Ddecoder=true`. The shim depends on libfaad3 and libfaar. Like FAAD2, it installs both `libfaad.so.2` and `libfaad_drm.so.2`, so existing reverse dependencies keep working. Output is not bit-identical to FAAD2, and DRM decoding is not implemented in either library.
 3. **Resolve the `faad` file overlap.** The `faad` binary and `faad.1` now come from the faac-built package, not the shim, so add Conflicts/Replaces to avoid two packages owning the same files. The new `faad` keeps option letters such as `-o`, `-w`, `-b`, `-f` and `-d`, but changes these arguments:
 
