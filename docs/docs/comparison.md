@@ -32,11 +32,11 @@ The FAAC project wrote this page and ran the [benchmark](/docs/aac-benchmark) it
 
 | Bitrate (stereo) | Profile | Encoders | Patents |
 | :--- | :--- | :--- | :--- |
-| 128 kbps and up | **AAC-LC** | FAAC, FDK-AAC, Apple, FFmpeg `aac` | Expired |
-| 16–96 kbps | **HE-AAC v1** | FAAC, FDK-AAC, Apple. Not FFmpeg `aac`. | Expired |
-| 16–24 kbps | **HE-AAC v2** | FDK-AAC, Apple, or FAAC with `encoder-ps` (off by default) | Parametric Stereo to 2030 |
+| 128 kbps and up | **AAC-LC** | FAAC, FDK-AAC, Apple, Ittiam, FFmpeg `aac` | Expired |
+| 16–96 kbps | **HE-AAC v1** | FAAC, FDK-AAC, Apple, Ittiam. Not FFmpeg `aac`. | Expired |
+| 16–24 kbps | **HE-AAC v2** | FDK-AAC, Apple, Ittiam, or FAAC with `encoder-ps` (off by default) | Parametric Stereo to 2030 |
 
-Profiles are not a quality ladder; each wins in a range. These ranges come from the FAAC project's benchmark at 48 kHz stereo ([full report](https://gist.github.com/nschimme/c6a8d8e95992f94650fc2c700581be40)). At 48 kbps, FAAC scores 4.297 MOS with HE-AAC v1 and 4.177 with LC. HE-AAC v2 leads at 16 kbps for FAAC, FDK-AAC and Apple. At 24 kbps it leads for FDK-AAC and Apple, while FAAC's HE-AAC v1 scores 3.484 against 3.283 for v2.
+Profiles are not a quality ladder; each wins in a range. These ranges come from the FAAC project's benchmark at 48 kHz stereo ([full report](https://gist.github.com/nschimme/42630f7e02f53367d6374ebd05864136)). At 48 kbps, FAAC scores 4.348 MOS with HE-AAC v1 and 4.175 with LC. HE-AAC v2 leads at 16 kbps for FAAC, FDK-AAC and Ittiam. At 24 kbps it leads for FDK-AAC, Apple and Ittiam, while FAAC's HE-AAC v1 scores 3.464 against 3.306 for v2.
 
 Crossovers vary by encoder, sample rate and content. Test your own audio with the [browser converter](/playground) or the [listening guide](/docs/listening).
 
@@ -65,7 +65,7 @@ A radio receiver also needs demodulation and service signaling.
 
 ### How good is FAAC?
 
-In our benchmark, FAAC matches or beats FDK-AAC, Apple and FFmpeg on objective quality at most bitrates, and it is the fastest of the four. FDK-AAC and Apple edge ahead at a few bitrates, by small margins. The scores are computer estimates, not listening tests, and the FAAC project ran them. See the [benchmark](/docs/aac-benchmark) for charts, numbers and method, and the [listening guide](/docs/listening) to check with your own ears.
+In our benchmark, FAAC matches or beats FDK-AAC, Apple, FFmpeg and Ittiam on objective quality at all but two bitrates, and it is the fastest of the five. Apple edges ahead at 192 and 320 kbps, by at most 0.003 MOS, a negligible gap. The scores are computer estimates, not listening tests, and the FAAC project ran them. See the [benchmark](/docs/aac-benchmark) for charts, numbers and method, and the [listening guide](/docs/listening) to check with your own ears.
 
 ## Opus, xHE-AAC, and other alternatives {data-icon="tower-broadcast"}
 

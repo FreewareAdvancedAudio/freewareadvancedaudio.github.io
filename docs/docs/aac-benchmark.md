@@ -1,39 +1,49 @@
 ---
 title: "FAAC vs FDK-AAC: AAC Speed, Quality, Size"
-description: "FAAC and FAAD3 benchmarked against FDK-AAC, Apple, FFmpeg and Helix: encoder speed, MOS quality from 16 to 320 kbps, memory and library size, with methods."
+description: "FAAC and FAAD3 benchmarked against FDK-AAC, Apple, FFmpeg, Ittiam and Helix: encoder speed, MOS quality from 16 to 320 kbps, memory and library size."
 ---
 
 # FAAC & FAAD vs FDK-AAC: Speed, Quality, and Build Size
 
-**Short answer:** in this benchmark, FAAC and FAAD3 are the fastest AAC encoder and decoder tested, and FAAC matches or beats FDK-AAC, Apple AAC and FFmpeg on objective quality at most bitrates, with the exceptions listed below. Together they are under a third of the ROM size of FDK-AAC, and both can be trimmed further at build time.
+**Short answer:** in this benchmark, FAAC and FAAD3 are the fastest AAC encoder and decoder tested, and FAAC matches or beats FDK-AAC, Apple AAC, FFmpeg and Ittiam on objective quality at all but two bitrates (see below). Together they are under a third of the ROM size of FDK-AAC, and both can be trimmed further at build time.
 
 - **Quality at a given bitrate:** see the [encoder quality chart](#aac-encoder-quality-faac-vs-fdk-aac-apple-aac-and-ffmpeg), which covers 16 to 320 kbps.
-- **Speed and memory:** see [encoder speed](#aac-encoder-speed-and-memory) and [decoder quality and speed](#aac-decoder-quality-and-speed).
+- **Speed and memory:** see [encoder speed, memory and bitrate accuracy](#aac-encoder-speed-memory-and-bitrate-accuracy) and [decoder quality and speed](#aac-decoder-quality-and-speed).
 - **Size and microcontrollers:** see [build size](#aac-library-size-faac-and-faad3-vs-fdk-aac) and [AAC on ESP32](/docs/esp32-aac), including the [build options](/docs/esp32-aac#trim-the-build) that shrink FAAC and FAAD to fit.
 - **Choosing by profile, license or patents:** use the [implementation comparison](/docs/comparison). This page covers measurements only.
 
-**Who ran this:** the benchmark is run by the FAAC project on its own [benchmark suite](https://github.com/nschimme/faac-benchmark), so read the results with that in mind. Every desktop figure is from one run on **November 10, 2026** on a **MacBook Pro M1, 32 GB**. Encoder and decoder results are separate sections of one generated leaderboard, not a single head-to-head.
+**Who ran this:** the benchmark is run by the FAAC project on its own [benchmark suite](https://github.com/nschimme/faac-benchmark), so read the results with that in mind. Every desktop figure is from one run on **November 18, 2026** on a **MacBook Pro M1, 32 GB**. Encoder and decoder results are separate sections of one generated leaderboard, not a single head-to-head.
 
-## AAC encoder quality: FAAC vs FDK-AAC, Apple AAC, and FFmpeg {data-icon="chart-line"}
+## AAC encoder quality: FAAC vs FDK-AAC, Apple AAC, FFmpeg, and Ittiam {data-icon="chart-line"}
 
 The chart plots average MOS (a 1.0–5.0 objective estimate, where 1.0 is poor and 5.0 is transparent; not a listening test) against requested bitrate, 16–320 kbps, for 48 kHz stereo. Each encoder is shown at its higher-scoring profile (AAC-LC or HE-AAC v1) at each bitrate.
 
 <BenchmarkShowcase view="quality" />
 
-**Where FAAC leads and where it doesn't** (48 kHz stereo, each encoder at its best profile):
+**Where FAAC leads and where it doesn't:**
 
-- **FAAC is highest** across 16–128 kbps.
-- **Apple edges ahead at 160–320 kbps**, by at most 0.008 MOS.
+- **Highest at 48 kHz stereo** at every bitrate but 192 and 320 kbps, where Apple leads by at most 0.003 MOS. That gap is negligible: every encoder scores 4.9–5.0 there.
+- **24 kHz mono speech:** FAAC leads by about 0.3 MOS at 28 and 32 kbps (4.663 and 4.728, against 4.337 and 4.435 for the next best).
 
-Every one of those gaps is small. Drag the marker on the chart to see the exact scores at any bitrate. At 48 kbps, for example, FAAC scores 4.347, FDK-AAC 4.267, Apple AAC 4.215 and FFmpeg 3.741.
+Gaps are large at 16–24 kbps. From 32 kbps up, the HE-AAC encoders stay within about 0.15 MOS of FAAC; FFmpeg, which has no HE-AAC, trails well behind through 48 kbps. Drag the marker on the chart to see the exact scores at any bitrate. At 48 kbps, for example, FAAC scores 4.348, FDK-AAC 4.267, Apple AAC 4.215, Ittiam 4.201 and FFmpeg 3.741.
 
-Across all 30 scenarios, FAAC also ranks first on both overall and first-percentile MOS (the score that 99% of clips meet), with 4.477 and 2.774. Per-scenario results, profile breakdowns and bitrate accuracy are in the [full report](https://gist.github.com/nschimme/8471fe960d7b7350247733b8e0daa386).
-
-## AAC encoder speed and memory {data-icon="gauge-high"}
+## AAC encoder speed, memory and bitrate accuracy {data-icon="gauge-high"}
 
 <BenchmarkShowcase view="resources" />
 
-FAAC is the fastest encoder in the comparison at 3.9× FDK-AAC throughput. It also has the lowest peak RAM of the four encoders: 2.6 MB, versus 3.3 MB for FDK-AAC, 8.4 MB for Apple AAC and 17.5 MB for FFmpeg.
+Ranked by first-percentile MOS (the score 99% of clips meet).
+
+| Encoder | 1st-percentile MOS | Overall MOS | Speed (× realtime) | Bitrate error | Peak RAM | Extra bitrate, LC (BD-rate) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| **FAAC** | **2.773** | **4.478** | **749** | **0.2%** | **2.5 MB** | baseline |
+| FDK-AAC | 2.509 | 4.411 | 190 | 1.1% | 3.2 MB | +45% |
+| Ittiam AAC | 2.450 | 4.343 | 95 | 1.0% | 61.0 MB | +46% |
+| FFmpeg AAC | 1.970 | 4.150 | 58 | 14.3% | 17.5 MB | +36% |
+| Apple AAC | 1.249 | 4.223 | 178 | 1.0% | 8.5 MB | +50% |
+
+Apple and Ittiam ran 28 of 30 scenarios (no 5.1). The last column is how much more bitrate an encoder needs than FAAC for the same MOS on AAC-LC, widest at 64 kbps and below, where most encoders would use HE-AAC instead.
+
+FAAC encodes 3.9× faster than FDK-AAC, 4.2× Apple AAC, 7.9× Ittiam and 12.9× FFmpeg.
 
 ## AAC decoder quality and speed {data-icon="headphones"}
 
@@ -41,19 +51,19 @@ FAAC is the fastest encoder in the comparison at 3.9× FDK-AAC throughput. It al
 
 FAAD3 is the fastest decoder tested and ties the top decoded quality.
 
-- **Speed:** 2.4× FDK-AAC throughput, and 1.9–3.9× Apple AAC and FFmpeg.
-- **Quality:** overall MOS is 4.093 for FAAD3, 4.093 for FFmpeg and 4.088 for FDK-AAC, which is effectively a tie. At 48 kHz stereo, FAAD3, FFmpeg and Apple match within about 0.003 MOS, and FDK-AAC does too on AAC-LC. On HE-AAC v1, FDK-AAC trails by up to about 0.03.
-- **Memory:** peak RAM is 3.0 MB for FAAD3, versus 7.0 MB for FDK-AAC, 7.9 MB for Apple AAC and 16.6 MB for FFmpeg. Only Helix AAC is lower, at 1.9 MB.
+| Decoder | Overall MOS | Speed | Peak RAM | Mean SNR | Failures |
+| :--- | ---: | ---: | ---: | ---: | :--- |
+| **FAAD3** | **4.048** | **2,242×** | 3.0 MB | **17.0 dB** | None |
+| FFmpeg AAC | **4.048** | 602× | 16.6 MB | **17.0 dB** | None |
+| FDK-AAC | 4.043 | 915× | 7.0 MB | **17.0 dB** | 36 runaways |
+| Ittiam AAC | 3.975 | 155× | 26.3 MB | 15.9 dB | 916 crashes |
+| Apple AAC | 3.950 | 1,171× | 8.0 MB | 13.9 dB | None |
+| Helix AAC | 3.822 | 1,031× | **1.9 MB** | 14.4 dB | 510 crashes, 102 timeouts |
 
-Since quality is a tie, the practical differences between FAAD3, FFmpeg and FDK-AAC are speed, memory and size.
+- **Speed:** FAAD3 is 2.5× FDK-AAC, 1.9× Apple AAC, 3.7× FFmpeg and 14.4× Ittiam.
+- **Quality:** FAAD3, FFmpeg and FDK-AAC are effectively tied. At 48 kHz stereo, FAAD3 and FFmpeg match within about 0.003 MOS, and FDK-AAC does too on AAC-LC. On HE-AAC v1, FDK-AAC trails by up to about 0.03 and Ittiam by up to about 0.07.
 
-**The other two decoders:**
-
-- **Apple AAC** scores lower overall (3.995 MOS, 14.1 dB mean SNR).
-- **Helix AAC** scores lowest (3.864 MOS). It recorded 416 crashes and 94 timeouts, and does not support HE-AAC v2 Parametric Stereo.
-- FDK-AAC recorded 5 runaways.
-
-Decoder timings were measured concurrently and include contention. For profile and licensing guidance, see the [implementation comparison](/docs/comparison).
+Helix also does not support HE-AAC v2 Parametric Stereo. Decoder timings were measured concurrently and include contention. For profile and licensing guidance, see the [implementation comparison](/docs/comparison).
 
 ## AAC library size: FAAC and FAAD3 vs FDK-AAC {data-icon="microchip"}
 
@@ -61,32 +71,34 @@ The benchmark measures the ROM image of the library each codec is built into. FD
 
 | Library | Covers | ROM image (default build) |
 | :--- | :--- | ---: |
-| FAAC + FAAD3 | Encoder (101.8 KB) + decoder (168.2 KB), built separately | 270.0 KB |
+| FAAC + FAAD3 | Encoder (104.3 KB) + decoder (168.2 KB), built separately | 272.5 KB |
 | FFmpeg AAC | Encoder (154.5 KB) + decoder (238.4 KB) | 392.9 KB |
 | FDK-AAC | Encoder and decoder | 940.5 KB |
+| Ittiam AAC | Encoder (1,794.8 KB) + decoder (about 1.9 MB) | about 3.7 MB |
 
 With the default build, FAAC and FAAD3 together are under a third of FDK-AAC's size. FAAC and FAAD are also configurable: you can build only the encoder or only the decoder, and switch off HE-AAC, HE-AAC v2, DAB, or DRC. On an ESP32-S3 an AAC-LC-only decoder is 28.8 KB and an AAC-LC-only encoder is 37.4 KB. See [build options for ESP32](/docs/esp32-aac#trim-the-build). Desktop and ESP32 figures differ because they use different compilers, targets and option sets.
 
 ## How the measurements are made {data-icon="flask"}
 
 - **Quality** is objective: ViSQOL scores speech and Zimtohrli scores music, each compared with the source. These are estimates, not listening-test results; [test audible quality](/docs/listening) yourself before relying on them. The suite covers mono speech, stereo music and multichannel audio at several sample rates, and also tracks difficult passages, transient timing and stereo image.
-- **Bitrate** on the chart is the requested target bitrate, not the actual payload rate. Actual payload rates and bitrate accuracy are in the [full report](https://gist.github.com/nschimme/8471fe960d7b7350247733b8e0daa386).
+- **Bitrate** on the chart is the requested target bitrate, not the actual payload rate. Actual payload rates and bitrate accuracy are in the [full report](https://gist.github.com/nschimme/42630f7e02f53367d6374ebd05864136).
 - **Speed and footprint** are throughput (audio duration per unit of processing time), peak process memory, and ROM image (`.text` + `.rodata` + `.data`, not the installed package size), recorded with each build's toolchain and settings.
 
 These figures are for one machine. Measure your own build on your target device: throughput alone does not establish live-audio delay or power use. Definitions are in the [benchmark docs](https://github.com/nschimme/faac-benchmark/blob/master/docs/metrics.md), with the [test scenarios](https://github.com/nschimme/faac-benchmark/blob/master/docs/benchmarking.md) and [footprint checks](https://github.com/nschimme/faac-benchmark/blob/master/docs/footprint-gate.md).
 
 ## Tested versions {data-icon="flask"}
 
-Run on November 10, 2026 (MacBook Pro M1, 32 GB). Throughput, peak RAM and ROM image are covered in the sections above; the [full leaderboard](https://gist.github.com/nschimme/8471fe960d7b7350247733b8e0daa386) has per-scenario results, profile breakdowns and bitrate accuracy.
+Run on November 18, 2026 (MacBook Pro M1, 32 GB). Throughput, peak RAM and ROM image are covered in the sections above; the [full leaderboard](https://gist.github.com/nschimme/42630f7e02f53367d6374ebd05864136) has per-scenario results, profile breakdowns and bitrate accuracy.
 
 | Implementation | Tested version or build | Tested as |
 | :--- | :--- | :--- |
-| FAAC / FAAD3 | 3.0.0 (`d0e59b21`) | Encoder / decoder |
+| FAAC / FAAD3 | 3.0.0 (`53eca6d3`) | Encoder / decoder |
 | FDK-AAC | 1.0.9 (encoder), 2.0.0 (decoder) | Encoder / decoder |
-| Apple AAC | 27.2 | Encoder / decoder |
+| Apple AAC | 27.2.1 | Encoder / decoder |
 | FFmpeg AAC | N-127192-gef52e1cc38, experimental NMR (encoder) | Encoder / decoder |
+| Ittiam AAC (libxaac) | 2.0 (encoder), 1.41 (decoder) | Encoder / decoder |
 | Helix AAC | 1.0 | Decoder only |
 
-The leaderboard covers 30 scenarios for FAAC, FDK-AAC, Apple and FFmpeg.
+The leaderboard covers 30 scenarios for FAAC, FDK-AAC and FFmpeg, and 28 for Apple (5.1 encoding fails) and Ittiam (no 5.1 support).
 
 **Next:** [choose an encoder or decoder](/docs/comparison), or [test audible quality](/docs/listening).

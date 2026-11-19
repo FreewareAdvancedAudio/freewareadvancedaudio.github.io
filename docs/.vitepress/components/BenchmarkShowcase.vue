@@ -1,28 +1,30 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const props = defineProps<{ view: 'resources' | 'decoder' | 'speed' | 'quality' }>()
 
-// Published snapshot: leaderboard gist, generated 2026-11-10. Do not mix with local runs.
+// Published snapshot: leaderboard gist, generated 2026-11-18. Do not mix with local runs.
 const encoders = [
-  { name: 'FAAC', speed: 748.7 },
-  { name: 'FDK-AAC', speed: 192.1 },
-  { name: 'Apple AAC', speed: 180.4 },
-  { name: 'FFmpeg AAC', speed: 58.4 }
+  { name: 'FAAC', speed: 749.3 },
+  { name: 'FDK-AAC', speed: 190.1 },
+  { name: 'Apple AAC', speed: 177.8 },
+  { name: 'FFmpeg AAC', speed: 58.1 },
+  { name: 'Ittiam AAC', speed: 95.2 }
 ]
 const encoderMetrics = [
-  { key: 'speed' as const, title: 'Encoding throughput', icon: 'gauge-high', value: '749×', unit: 'realtime', summary: '3.9× the measured FDK-AAC throughput', max: 748.7, format: (n: number) => `${Math.round(n).toLocaleString('en-US')}×`, note: 'Aggregate throughput · higher is better' }
+  { key: 'speed' as const, title: 'Encoding throughput', icon: 'gauge-high', value: '749×', unit: 'realtime', summary: '3.9× the measured FDK-AAC throughput', max: 749.3, format: (n: number) => `${Math.round(n).toLocaleString('en-US')}×`, note: 'Aggregate throughput · higher is better' }
 ]
 const decoders = [
   // Lead with FAAD3; then follow the encoder card order and append decoder-only implementations.
-  { name: 'FAAD3', speed: 2269.1 },
-  { name: 'FDK-AAC', speed: 945.8 },
-  { name: 'Apple AAC', speed: 1172.2 },
-  { name: 'FFmpeg AAC', speed: 577.6 },
-  { name: 'Helix AAC', speed: 1030.5 }
+  { name: 'FAAD3', speed: 2241.9 },
+  { name: 'FDK-AAC', speed: 915.0 },
+  { name: 'Apple AAC', speed: 1170.8 },
+  { name: 'FFmpeg AAC', speed: 601.7 },
+  { name: 'Ittiam AAC', speed: 155.4 },
+  { name: 'Helix AAC', speed: 1031.4 }
 ]
 const decoderMetrics = [
-  { key: 'speed' as const, title: 'Decoding throughput', icon: 'gauge-high', value: '2,269×', unit: 'realtime', summary: '2.4× the measured FDK-AAC throughput', max: 2269.1, format: (n: number) => `${Math.round(n).toLocaleString('en-US')}×`, note: 'Aggregate throughput · higher is better' }
+  { key: 'speed' as const, title: 'Decoding throughput', icon: 'gauge-high', value: '2,242×', unit: 'realtime', summary: '2.5× the measured FDK-AAC throughput', max: 2241.9, format: (n: number) => `${Math.round(n).toLocaleString('en-US')}×`, note: 'Aggregate throughput · higher is better' }
 ]
 const metrics = computed(() => props.view === 'decoder' ? decoderMetrics : encoderMetrics)
 const implementations = computed(() => props.view === 'decoder' ? decoders : encoders)
@@ -39,8 +41,8 @@ const rawQualitySeries = [
     color: '#67e8f9',
     dash: '',
     values: {
-      lc: [2.085, 3.280, 3.758, 3.965, 4.174, 4.467, 4.611, 4.739, 4.866, 4.926, 4.955, 4.981, 4.991],
-      he: [2.963, 3.476, 3.841, 4.165, 4.347, 4.569, 4.692, 4.755, 4.810, 4.828, 4.832, 4.833, 4.833]
+      lc: [1.950, 3.266, 3.757, 3.971, 4.175, 4.470, 4.614, 4.741, 4.868, 4.926, 4.955, 4.981, 4.991],
+      he: [2.907, 3.464, 3.842, 4.165, 4.348, 4.569, 4.692, 4.755, 4.810, 4.828, 4.832, 4.833, 4.833]
     }
   },
   {
@@ -71,6 +73,16 @@ const rawQualitySeries = [
     values: {
       lc: [2.329, 2.335, 2.373, 2.609, 3.741, 4.306, 4.535, 4.680, 4.799, 4.883, 4.928, 4.935, 4.943],
       he: [null, null, null, null, null, null, null, null, null, null, null, null, null]
+    }
+  },
+  {
+    name: 'Ittiam AAC',
+    label: { lc: 'Ittiam AAC · LC', he: 'Ittiam AAC · HE v1' },
+    color: '#f9a8d4',
+    dash: '8 3 2 3',
+    values: {
+      lc: [1.642, 2.022, 2.503, 2.763, 2.964, 4.269, 4.596, 4.709, 4.813, 4.867, 4.941, 4.975, 4.985],
+      he: [2.087, 3.240, 3.796, 4.088, 4.201, 4.498, 4.627, 4.734, 4.841, 4.890, 4.910, 4.914, 4.912]
     }
   }
 ]
@@ -112,6 +124,29 @@ const linePoints = (values: (number | null)[]) => values
 const selectedIndex = ref(rates.indexOf(48))
 const selectedRate = computed(() => rates[selectedIndex.value])
 const dragging = ref(false)
+// Until the reader touches the chart, the marker pulses and sweeps once to show it moves.
+const touched = ref(false)
+const chartEl = ref<SVGElement | null>(null)
+let demoTimer: ReturnType<typeof setInterval> | undefined
+let observer: IntersectionObserver | undefined
+const stopDemo = () => { touched.value = true; if (demoTimer) clearInterval(demoTimer); observer?.disconnect() }
+onMounted(() => {
+  if (props.view !== 'quality' || !chartEl.value || typeof IntersectionObserver === 'undefined') return
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+  observer = new IntersectionObserver(entries => {
+    if (!entries.some(entry => entry.isIntersecting) || touched.value) return
+    observer?.disconnect()
+    const start = selectedIndex.value
+    const path = [1, 2, 3, 4, 3, 2, 1, 0].map(step => Math.min(rates.length - 1, start + step))
+    let i = 0
+    demoTimer = setInterval(() => {
+      if (touched.value || i >= path.length) { clearInterval(demoTimer); return }
+      selectedIndex.value = path[i++]
+    }, 260)
+  }, { threshold: 0.6 })
+  observer.observe(chartEl.value)
+})
+onBeforeUnmount(() => { if (demoTimer) clearInterval(demoTimer); observer?.disconnect() })
 const indexAt = (event: PointerEvent) => {
   const rect = (event.currentTarget as SVGElement).getBoundingClientRect()
   const svgX = (event.clientX - rect.left) / rect.width * chart.width
@@ -122,6 +157,7 @@ const indexAt = (event: PointerEvent) => {
   return best
 }
 const onDown = (event: PointerEvent) => {
+  stopDemo()
   dragging.value = true
   ;(event.currentTarget as SVGElement).setPointerCapture(event.pointerId)
   selectedIndex.value = indexAt(event)
@@ -129,6 +165,7 @@ const onDown = (event: PointerEvent) => {
 const onMove = (event: PointerEvent) => { if (dragging.value) selectedIndex.value = indexAt(event) }
 const onUp = () => { dragging.value = false }
 const onKey = (event: KeyboardEvent) => {
+  stopDemo()
   const step = event.key === 'ArrowRight' || event.key === 'ArrowUp' ? 1 : event.key === 'ArrowLeft' || event.key === 'ArrowDown' ? -1 : 0
   if (event.key === 'Home') selectedIndex.value = 0
   else if (event.key === 'End') selectedIndex.value = rates.length - 1
@@ -200,6 +237,8 @@ const displayScore = (score: number | null) => score === null ? '—' : score.to
   <figure v-else class="quality-chart" aria-labelledby="quality-chart-caption">
     <figcaption id="quality-chart-caption">48 kHz stereo · average objective MOS across 16–320 kbps · higher is better</figcaption>
 
+    <p class="chart-hint"><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i> Drag the cyan marker to compare encoders at any bitrate</p>
+
     <ul class="series-legend">
       <li v-for="series in plottedSeries" :key="series.name">
         <span class="legend-swatch" :style="{ background: series.dash ? `repeating-linear-gradient(90deg, ${series.color} 0 5px, transparent 5px 9px)` : series.color }"></span>
@@ -207,7 +246,7 @@ const displayScore = (score: number | null) => score === null ? '—' : score.to
       </li>
     </ul>
 
-    <svg class="quality-svg draggable" :class="{ dragging }" :viewBox="`0 0 ${chart.width} ${chart.height}`" role="slider" tabindex="0" :aria-label="qualityAria" aria-orientation="horizontal" :aria-valuemin="minRate" :aria-valuemax="maxRate" :aria-valuenow="selectedRate" :aria-valuetext="`${selectedRate} kbps`" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp" @keydown="onKey">
+    <svg ref="chartEl" class="quality-svg draggable" :class="{ dragging }" :viewBox="`0 0 ${chart.width} ${chart.height}`" role="slider" tabindex="0" :aria-label="qualityAria" aria-orientation="horizontal" :aria-valuemin="minRate" :aria-valuemax="maxRate" :aria-valuenow="selectedRate" :aria-valuetext="`${selectedRate} kbps`" @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp" @pointercancel="onUp" @keydown="onKey">
       <title>Average MOS vs bitrate. Drag to choose a bitrate.</title>
       <g aria-hidden="true">
         <rect class="hit-area" :x="chart.left" :y="chart.top" :width="plotWidth" :height="plotHeight" />
@@ -225,12 +264,12 @@ const displayScore = (score: number | null) => score === null ? '—' : score.to
       <g aria-hidden="true" pointer-events="none">
         <line class="cursor-line" :x1="xFor(selectedRate)" :x2="xFor(selectedRate)" :y1="chart.top" :y2="chart.top + plotHeight" />
         <g :transform="`translate(${xFor(selectedRate)} ${chart.top + plotHeight})`">
-          <rect class="cursor-handle" x="-24" y="2" width="48" height="20" rx="10" />
-          <text class="cursor-text" x="0" y="16" text-anchor="middle">{{ selectedRate }}</text>
+          <rect class="cursor-handle" :class="{ pulse: !touched }" x="-32" y="2" width="64" height="20" rx="10" />
+          <text class="cursor-text" x="0" y="16" text-anchor="middle">‹ {{ selectedRate }} ›</text>
         </g>
       </g>
     </svg>
-    <p class="chart-note">Drag the marker along the chart, or focus it and use the arrow keys, to inspect a bitrate. The shaded region is what the magnified view shows.</p>
+    <p class="chart-note">Keyboard: focus the chart and use the arrow keys. The shaded region is what the magnified view shows.</p>
 
     <div class="detail-grid">
       <div class="detail-panel">
@@ -300,6 +339,10 @@ const displayScore = (score: number | null) => score === null ? '—' : score.to
 .hit-area { fill: transparent; }
 .cursor-line { stroke: var(--vp-c-text-2); stroke-width: 1; stroke-dasharray: 3 3; }
 .cursor-handle { fill: var(--audio-icon-cyan); }
+.chart-hint { margin: 10px 0 0; font-size: 13px; font-weight: 600; color: var(--audio-icon-cyan); }
+.cursor-handle.pulse { animation: handle-pulse 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes handle-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.75; transform: scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .cursor-handle.pulse { animation: none; } }
 .cursor-text { fill: #0b1220; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--vp-c-divider); }
 .detail-panel .resource-rows { margin-top: 12px; }

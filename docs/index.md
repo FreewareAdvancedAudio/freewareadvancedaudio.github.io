@@ -22,7 +22,7 @@ hero:
 features:
   - icon: "<i class=\"fa-solid fa-bolt feature-icon feature-icon--cyan\" aria-hidden=\"true\"></i>"
     title: "Fast encoding"
-    details: "Faster aggregate encoding than the compared FDK-AAC, Apple AAC, and FFmpeg AAC builds in published testing, and real time on the ESP32 and ESP32-S3."
+    details: "Faster aggregate encoding than every compared encoder in published testing, and real time on the ESP32 and ESP32-S3."
     link: "/docs/aac-benchmark"
     linkText: "Compare encoding speed"
   - icon: "<i class=\"fa-solid fa-sliders feature-icon feature-icon--blue\" aria-hidden=\"true\"></i>"
@@ -50,9 +50,9 @@ features:
 
 <BenchmarkShowcase view="speed" />
 
-FAAC encodes 3.9× faster than FDK-AAC, and FAAD3 decodes 2.4× faster. FAAD3 also ties the top overall MOS.
+FAAC encodes 3.9× faster than FDK-AAC, and FAAD3 decodes 2.5× faster. FAAD3 also ties the top overall MOS.
 
-**Benchmark snapshot · November 10, 2026 · MacBook Pro M1, 32 GB.** Encoder and decoder figures come from the same generated leaderboard. Results depend on the tested builds and hardware. See the [benchmark results and tested versions](/docs/aac-benchmark).
+**Benchmark snapshot · November 18, 2026 · MacBook Pro M1, 32 GB.** Encoder and decoder figures come from the same generated leaderboard. Results depend on the tested builds and hardware. See the [benchmark results and tested versions](/docs/aac-benchmark).
 
 ### Build only what you need {data-icon="sliders"}
 

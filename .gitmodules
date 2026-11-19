@@ -1,6 +1,6 @@
 [submodule "vendor/faac"]
 	path = vendor/faac
-	url = https://github.com/nschimme/faac.git
+	url = https://github.com/FreewareAdvancedAudio/faac.git
 	branch = master
 [submodule "vendor/faac-media"]
 	path = vendor/faac-media
