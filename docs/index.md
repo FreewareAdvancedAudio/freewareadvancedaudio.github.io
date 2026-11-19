@@ -100,6 +100,7 @@ From camera firmware to desktop audio tools, these projects integrate FAAC or FA
 | [GStreamer](https://gstreamer.freedesktop.org/) | Provides [FAAC encoding](https://gstreamer.freedesktop.org/documentation/faac/index.html) and [FAAD2 decoding](https://gstreamer.freedesktop.org/documentation/faad/index.html) elements for multimedia pipelines. |
 | [LightNVR](https://lightnvr.com/) | Bundles the [FAAC encoder](https://github.com/opensensor/lightNVR/blob/main/src/video/faac_encoder.c) to transcode camera audio to AAC in its open-source network video recorder. |
 | [VLC Media Player](https://www.videolan.org/vlc/) | Includes a [FAAD2 decoder integration](https://github.com/videolan/vlc/blob/master/modules/codec/faad.c). |
+| [Audacious](https://audacious-media-player.org/) | Uses a [FAAD2 decoder plugin](https://github.com/audacious-media-player/audacious-plugins/blob/4.1.x/src/aac/aac.cc) to play AAC files in its audio player. |
 | [fre:ac](https://www.freac.org/) | [Uses FAAC and FAAD2](https://github.com/enzo1982/freac/blob/master/Readme) for AAC conversion in its audio converter and CD ripper. |
 | [AudioBook Boss](https://audiobookboss.app/) | Uses FAAC and FAAD3 to encode and decode AAC audio in its desktop audiobook manager. |
 
