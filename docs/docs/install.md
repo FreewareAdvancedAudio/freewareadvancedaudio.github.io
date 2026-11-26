@@ -59,7 +59,7 @@ Package managers mostly ship the older FAAD2 decoder, not the current FAAD3 libr
 
 Packagers and maintainers moving off FAAD2: see the [migration guide](/docs/faad#moving-from-faad2).
 
-FAAC 3.0 is the latest release and includes FAAD3, FAAM and FAAR. For closed-source linking, use FAAC 2.0 or later and FAAD3. See [software licenses](/docs/comparison#software-licenses-and-patent-rights).
+FAAC 3.0.1 is the latest release and includes FAAD3, FAAM and FAAR. For closed-source linking, use FAAC 2.0 or later and FAAD3. See [software licenses](/docs/comparison#software-licenses-and-patent-rights).
 
 ## Build the current libraries and tools from source {data-icon="code"}
 
